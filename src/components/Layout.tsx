@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, CalendarDays, FolderKanban, ListChecks, LogOut, Megaphone, Menu, MessagesSquare, Palmtree, Search, ShieldCheck, Sun, Users } from 'lucide-react';
+import { Bell, BookOpen, CalendarDays, FolderKanban, Link2, ListChecks, LogOut, Megaphone, Menu, MessagesSquare, Palmtree, Search, ShieldCheck, Sun, Users } from 'lucide-react';
 import { useStore } from '../state/store';
 import { isAdmin } from '../lib/permissions';
 import { fmtStamp } from '../lib/dates';
@@ -38,6 +38,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { to: '/agenda', label: 'Agenda', icon: CalendarDays },
     { to: '/absences', label: 'Absences', icon: Palmtree, count: me.role === 'admin' ? snap.absences.filter((a) => a.status === 'en_attente').length : 0 },
     { to: '/documents', label: 'Documents', icon: BookOpen },
+    { to: '/liens', label: 'Liens utiles', icon: Link2 },
     { to: '/equipe', label: 'Équipe', icon: Users },
   ];
 

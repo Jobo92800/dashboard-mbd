@@ -41,6 +41,8 @@ export function visibleFor(me: Profile, s: Snapshot): Snapshot {
     reads: s.reads.filter((r) => convIds.has(r.conversation_id)), // « Vu par » : lectures des autres membres
     reactions: s.reactions.filter((r) => s.messages.some((m) => m.id === r.message_id && convIds.has(m.conversation_id))),
     docs: isAdmin(me) ? s.docs : s.docs.filter((d) => !d.admins_only),
+    link_folders: isAdmin(me) ? s.link_folders : s.link_folders.filter((f) => !f.admins_only),
+    links: isAdmin(me) ? s.links : s.links.filter((l) => !l.folder_id || s.link_folders.some((f) => f.id === l.folder_id && !f.admins_only)),
   };
   if (isAdmin(me)) return { ...s, ...privateParts };
   const visibleTasks = s.tasks.filter((t) => canSeeTask(me, t, s.projects.filter((p) => p.member_ids.includes(me.id))));

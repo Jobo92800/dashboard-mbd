@@ -236,6 +236,31 @@ export interface ReadMark {
   pinned: boolean; // épinglée en haut de la liste
 }
 
+/** Dossier de liens utiles (Applications, Landing pages…). */
+export interface LinkFolder {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  position: number;
+  admins_only: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface UsefulLink {
+  id: string;
+  folder_id: string | null;
+  title: string;
+  url: string;
+  description: string;
+  pinned: boolean; // favori, affiché tout en haut
+  position: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Snapshot {
   profiles: Profile[];
   projects: Project[];
@@ -254,6 +279,8 @@ export interface Snapshot {
   announcement_reads: AnnouncementRead[];
   docs: Doc[];
   absences: Absence[];
+  link_folders: LinkFolder[];
+  links: UsefulLink[];
 }
 
 export type Table = keyof Snapshot;

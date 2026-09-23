@@ -12,7 +12,7 @@ function clean<T extends object>(row: T): T {
 const TABLES: Table[] = [
   'profiles', 'projects', 'tasks', 'comments', 'events', 'notifications', 'activity',
   'conversations', 'messages', 'reads', 'task_comments', 'templates',
-  'reactions', 'announcements', 'announcement_reads', 'docs', 'absences',
+  'reactions', 'announcements', 'announcement_reads', 'docs', 'absences', 'link_folders', 'links',
 ];
 
 export function makeSupabaseBackend(url: string, anonKey: string): Backend {

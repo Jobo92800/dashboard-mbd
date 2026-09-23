@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { backend } from '../data';
 import { uid } from '../data/backend';
 import type { NewMember } from '../data/backend';
-import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, ChecklistItem, Conversation, Doc, Message, Profile, Project, ProjectTemplate, ReadMark, Snapshot, Task, TaskStatus } from '../lib/types';
+import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, ChecklistItem, Conversation, Doc, LinkFolder, Message, Profile, Project, ProjectTemplate, ReadMark, Snapshot, Task, TaskStatus, UsefulLink } from '../lib/types';
 import { nextOccurrence, shiftIso } from '../lib/recurrence';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useToast } from './toast';
@@ -13,7 +13,7 @@ type AttachmentInput = { file?: File; name?: string; url?: string };
 const EMPTY: Snapshot = {
   profiles: [], projects: [], tasks: [], comments: [], events: [], notifications: [], activity: [],
   conversations: [], messages: [], reads: [], task_comments: [], templates: [],
-  reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [],
+  reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [],
 };
 const now = () => new Date().toISOString();
 
@@ -585,6 +585,76 @@ function useStoreValue() {
       const current = snapRef.current.docs.find((x) => x.id === d.id) ?? d;
       const patch = { attachments: current.attachments.filter((a) => a.id !== attId) };
       return run((st) => ({ ...st, docs: st.docs.map((x) => (x.id === d.id ? { ...x, ...patch } : x)) }), () => backend.update('docs', d.id, patch));
+    },
+
+    // ---------- Liens utiles ----------
+    async saveFolder(f: Partial<LinkFolder> & { name: string }) {
+      const existing = f.id ? snapRef.current.link_folders.find((x) => x.id === f.id) : undefined;
+      if (existing) {
+        await run((st) => ({ ...st, link_folders: st.link_folders.map((x) => (x.id === f.id ? { ...x, ...f } : x)) }), () => backend.update('link_folders', existing.id, f), 'Dossier mis à jour');
+        return existing.id;
+      }
+      const position = Math.max(-1, ...snapRef.current.link_folders.map((x) => x.position)) + 1;
+      const row: LinkFolder = { id: uid(), emoji: '📁', color: '#3bbfbf', admins_only: false, created_by: me!.id, created_at: now(), position, ...f } as LinkFolder;
+      await run((st) => ({ ...st, link_folders: [...st.link_folders, row] }), () => backend.insert('link_folders', row), 'Dossier créé');
+      return row.id;
+    },
+
+    /** Supprime un dossier ; ses liens partent dans « Sans dossier » ou sont supprimés avec lui. */
+    async deleteFolder(f: LinkFolder, withLinks: boolean) {
+      const inside = snapRef.current.links.filter((l) => l.folder_id === f.id);
+      await run(
+        (st) => ({
+          ...st,
+          link_folders: st.link_folders.filter((x) => x.id !== f.id),
+          links: withLinks ? st.links.filter((l) => l.folder_id !== f.id) : st.links.map((l) => (l.folder_id === f.id ? { ...l, folder_id: null } : l)),
+        }),
+        async () => {
+          for (const l of inside) await (withLinks ? backend.remove('links', l.id) : backend.update('links', l.id, { folder_id: null }));
+          await backend.remove('link_folders', f.id);
+        },
+        'Dossier supprimé',
+      );
+    },
+
+    /** Monte ou descend un dossier d'un cran. */
+    moveFolder(f: LinkFolder, dir: -1 | 1) {
+      const sorted = [...snapRef.current.link_folders].sort((a, b) => a.position - b.position);
+      const i = sorted.findIndex((x) => x.id === f.id);
+      const other = sorted[i + dir];
+      if (!other) return Promise.resolve();
+      return run(
+        (st) => ({ ...st, link_folders: st.link_folders.map((x) => (x.id === f.id ? { ...x, position: other.position } : x.id === other.id ? { ...x, position: f.position } : x)) }),
+        async () => { await backend.update('link_folders', f.id, { position: other.position }); await backend.update('link_folders', other.id, { position: f.position }); },
+      );
+    },
+
+    saveLink(l: Partial<UsefulLink> & { title: string; url: string }) {
+      const existing = l.id ? snapRef.current.links.find((x) => x.id === l.id) : undefined;
+      if (existing) {
+        const patch = { ...l, updated_at: now() };
+        return run((st) => ({ ...st, links: st.links.map((x) => (x.id === l.id ? { ...x, ...patch } : x)) }), () => backend.update('links', existing.id, patch), 'Lien mis à jour');
+      }
+      const position = Math.max(-1, ...snapRef.current.links.filter((x) => x.folder_id === (l.folder_id ?? null)).map((x) => x.position)) + 1;
+      const row: UsefulLink = { id: uid(), folder_id: null, description: '', pinned: false, created_by: me!.id, created_at: now(), updated_at: now(), position, ...l } as UsefulLink;
+      return run((st) => ({ ...st, links: [...st.links, row] }), () => backend.insert('links', row), 'Lien ajouté');
+    },
+
+    async addLinks(items: { url: string; title: string }[], folderId: string | null) {
+      let position = Math.max(-1, ...snapRef.current.links.filter((x) => x.folder_id === folderId).map((x) => x.position)) + 1;
+      const rows: UsefulLink[] = items.map((it) => ({
+        id: uid(), folder_id: folderId, title: it.title, url: it.url, description: '', pinned: false,
+        position: position++, created_by: me!.id, created_at: now(), updated_at: now(),
+      }));
+      await run((st) => ({ ...st, links: [...st.links, ...rows] }), () => backend.insertMany('links', rows), `${rows.length} lien${rows.length > 1 ? 's' : ''} ajouté${rows.length > 1 ? 's' : ''}`);
+    },
+
+    toggleLinkPin(l: UsefulLink) {
+      return run((st) => ({ ...st, links: st.links.map((x) => (x.id === l.id ? { ...x, pinned: !l.pinned } : x)) }), () => backend.update('links', l.id, { pinned: !l.pinned }), l.pinned ? 'Retiré des favoris' : 'Ajouté aux favoris');
+    },
+
+    deleteLink(l: UsefulLink) {
+      return run((st) => ({ ...st, links: st.links.filter((x) => x.id !== l.id) }), () => backend.remove('links', l.id), 'Lien supprimé');
     },
 
     // ---------- Absences ----------

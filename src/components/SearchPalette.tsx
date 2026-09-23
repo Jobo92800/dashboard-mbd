@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, FolderKanban, ListChecks, Megaphone, MessagesSquare, Search, UserRound } from 'lucide-react';
+import { BookOpen, FolderKanban, Link2, ListChecks, Megaphone, MessagesSquare, Search, UserRound } from 'lucide-react';
 import { useStore } from '../state/store';
 import { relativeLabel } from '../lib/dates';
 import { conversationName } from '../lib/conversations';
@@ -24,6 +24,8 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
       const p = snap.projects.find((x) => x.id === t.project_id);
       out.push({ key: t.id, icon: ListChecks, title: t.title, sub: `${p ? p.name : 'Tâche rapide'} · ${relativeLabel(t.due_date)}`, to: p ? `/projets/${p.id}?tache=${t.id}` : `/taches?tache=${t.id}` });
     });
+    snap.links.filter((l) => norm(`${l.title} ${l.url} ${l.description}`).includes(n)).slice(0, 5)
+      .forEach((l) => out.push({ key: l.id, icon: Link2, title: l.title, sub: `Lien · ${l.url.replace(/^https?:\/\//, '')}`, to: '/liens' }));
     snap.docs.filter((d) => norm(`${d.title} ${d.content}`).includes(n)).slice(0, 5)
       .forEach((d) => out.push({ key: d.id, icon: BookOpen, title: d.title, sub: `Document · ${d.category}`, to: `/documents/${d.id}` }));
     snap.announcements.filter((a) => norm(`${a.title} ${a.body}`).includes(n)).slice(0, 3)

@@ -57,6 +57,11 @@ expliquer en français, sans jargon.
   16 px sous `lg` (pas de zoom iOS), `.grid > * { min-width: 0 }` contre les
   débordements, `.hover-reveal` et `[@media(hover:hover)]` pour les actions au
   survol (au doigt : toucher un message). Tableaux → cartes sous `sm`.
+- Liens utiles (migration 007) : `link_folders` (emoji, couleur, position,
+  `admins_only`) et `links` (favori `pinned`). Ajout en lot `parseBulk` : une
+  ligne « Dossier X : » crée/choisit le dossier. Icône = `<origine>/favicon.ico`
+  du site (pas de service tiers). La 007 insère les dossiers « Application » et
+  « LP » fournis par Jonathan.
 - Mise en production : tester en démo → valider 004 en transaction annulée →
   demander à Jonathan → `db:push` → aperçu Netlify → production.
 

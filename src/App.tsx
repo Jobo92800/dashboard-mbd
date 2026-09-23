@@ -15,6 +15,7 @@ import Messages from './pages/Messages';
 import Announcements from './pages/Announcements';
 import Docs from './pages/Docs';
 import Absences from './pages/Absences';
+import Links from './pages/Links';
 
 export default function App() {
   const { me, booting, recovery } = useStore();
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/documents" element={<Docs />} />
         <Route path="/documents/:id" element={<Docs />} />
         <Route path="/absences" element={<Absences />} />
+        <Route path="/liens" element={<Links />} />
         <Route path="/messages/:id" element={<Messages />} />
         <Route path="/equipe" element={<Team />} />
         <Route path="/admin" element={<Admin />} />

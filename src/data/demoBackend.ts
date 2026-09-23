@@ -24,7 +24,7 @@ function read(): Snapshot {
 function normalize(raw: Partial<Snapshot>): Snapshot {
   const s = {
     conversations: [], messages: [], reads: [], task_comments: [], templates: [],
-    reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], ...raw,
+    reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [], ...raw,
   } as Snapshot;
   s.messages = s.messages.map((m) => ({ ...m, reply_to: m.reply_to ?? null, attachments: m.attachments ?? [], edited_at: m.edited_at ?? null }));
   s.conversations = s.conversations.map((c) => ({
@@ -141,6 +141,7 @@ export const demoBackend: Backend = {
       s.comments = s.comments.filter((c) => c.project_id !== id);
     }
     if (table === 'tasks') s.task_comments = s.task_comments.filter((c) => c.task_id !== id);
+    if (table === 'link_folders') s.links = s.links.map((l) => (l.folder_id === id ? { ...l, folder_id: null } : l));
     if (table === 'messages') s.reactions = s.reactions.filter((r) => r.message_id !== id);
     if (table === 'announcements') s.announcement_reads = s.announcement_reads.filter((r) => r.announcement_id !== id);
     if (table === 'conversations') {

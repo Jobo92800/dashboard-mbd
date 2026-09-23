@@ -2084,5 +2084,89 @@
    "created_by": "u-marie",
    "created_at": "2026-09-23T10:00:00.000Z"
   }
+ ],
+ "link_folders": [
+  {
+   "id": "lf-app",
+   "name": "Applications",
+   "emoji": "📱",
+   "color": "#3bbfbf",
+   "position": 0,
+   "admins_only": false,
+   "created_by": "u-jo",
+   "created_at": "2026-09-23T09:00:00.000Z"
+  },
+  {
+   "id": "lf-lp",
+   "name": "Landing pages",
+   "emoji": "🌐",
+   "color": "#e8318a",
+   "position": 1,
+   "admins_only": false,
+   "created_by": "u-jo",
+   "created_at": "2026-09-23T09:00:00.000Z"
+  }
+ ],
+ "links": [
+  {
+   "id": "ln-0",
+   "folder_id": "lf-app",
+   "title": "Appli thérapeute",
+   "url": "https://app.mabeautyplus.fr/",
+   "description": "Suivi des clientes, BioPortrait, contrats",
+   "pinned": true,
+   "position": 0,
+   "created_by": "u-jo",
+   "created_at": "2026-09-23T09:00:00.000Z",
+   "updated_at": "2026-09-23T09:00:00.000Z"
+  },
+  {
+   "id": "ln-1",
+   "folder_id": "lf-app",
+   "title": "CRM Prospect",
+   "url": "https://crmnews.netlify.app/",
+   "description": "",
+   "pinned": false,
+   "position": 1,
+   "created_by": "u-jo",
+   "created_at": "2026-09-23T09:00:00.000Z",
+   "updated_at": "2026-09-23T09:00:00.000Z"
+  },
+  {
+   "id": "ln-2",
+   "folder_id": "lf-app",
+   "title": "Appli Podcast",
+   "url": "https://applinutritonjuin2026.netlify.app/",
+   "description": "Nutrition + parcours audio des clientes",
+   "pinned": false,
+   "position": 2,
+   "created_by": "u-jo",
+   "created_at": "2026-09-23T09:00:00.000Z",
+   "updated_at": "2026-09-23T09:00:00.000Z"
+  },
+  {
+   "id": "ln-3",
+   "folder_id": "lf-lp",
+   "title": "Méthode MAbeautyplus",
+   "url": "https://methode.mabeautyplus.fr",
+   "description": "",
+   "pinned": false,
+   "position": 3,
+   "created_by": "u-jo",
+   "created_at": "2026-09-23T09:00:00.000Z",
+   "updated_at": "2026-09-23T09:00:00.000Z"
+  },
+  {
+   "id": "ln-4",
+   "folder_id": "lf-lp",
+   "title": "Bio-Portrait",
+   "url": "https://bioportraitdecouverte.mabeautyplus.fr",
+   "description": "",
+   "pinned": false,
+   "position": 4,
+   "created_by": "u-jo",
+   "created_at": "2026-09-23T09:00:00.000Z",
+   "updated_at": "2026-09-23T09:00:00.000Z"
+  }
  ]
 }
