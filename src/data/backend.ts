@@ -25,8 +25,8 @@ export interface Backend {
   uploadFile(file: File, folder: string, bucket?: Bucket): Promise<{ path: string; url: string }>;
   /** Adresse temporaire pour ouvrir un fichier joint. */
   fileUrl(path: string, fallback: string, bucket?: Bucket): Promise<string>;
-  /** Dépose la photo de profil (déjà recadrée) et renvoie son adresse publique. */
-  uploadAvatar(image: Blob, userId: string): Promise<string>;
+  /** Dépose une photo (profil : dossier = id de la personne ; groupe : « groupes/<id> »). */
+  uploadAvatar(image: Blob, folder: string): Promise<string>;
   /** Crée ou remplace la ligne portant cet id. */
   upsert<T extends Table>(table: T, row: Snapshot[T][number]): Promise<void>;
   /** Jeton de session, pour appeler les fonctions serveur. */

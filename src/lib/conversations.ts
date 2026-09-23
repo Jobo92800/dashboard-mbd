@@ -8,3 +8,11 @@ export function conversationName(c: Conversation, meId: string, byId: Map<string
   if (others.length === 0) return 'Moi uniquement';
   return others.map((p) => p?.full_name.split(' ')[0] ?? '?').join(', ');
 }
+
+/** Un groupe = conversation nommée ou à plus de deux. */
+export const isGroup = (c: Conversation) => !!c.title || c.member_ids.length > 2;
+
+/** Peut gérer le groupe : admin du groupe, ou administrateur de MA HQ. */
+export function canManage(c: Conversation, me: Profile | null) {
+  return !!me && (c.admin_ids.includes(me.id) || (me.role === 'admin' && me.active));
+}

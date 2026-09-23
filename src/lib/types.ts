@@ -152,6 +152,9 @@ export interface Conversation {
   created_at: string;
   last_message_at: string;
   pinned_ids: string[]; // messages épinglés
+  avatar_url: string | null; // photo du groupe
+  description: string;
+  admin_ids: string[]; // administrateurs du groupe (le créateur au départ)
 }
 
 export interface Message {
@@ -223,12 +226,14 @@ export interface Absence {
   created_at: string;
 }
 
-/** Dernière lecture d'une conversation par une personne (id = conversation:personne). */
+/** Préférences d'une personne sur une conversation (id = conversation:personne). */
 export interface ReadMark {
   id: string;
   conversation_id: string;
   user_id: string;
-  read_at: string;
+  read_at: string; // dernière lecture (sert aussi au « Vu par »)
+  muted: boolean; // sourdine : ni son ni alerte (les @mentions passent)
+  pinned: boolean; // épinglée en haut de la liste
 }
 
 export interface Snapshot {

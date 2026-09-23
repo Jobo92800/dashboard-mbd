@@ -46,6 +46,11 @@ expliquer en français, sans jargon.
   les fiches tâche et événement. Buckets privés `messagerie/<conv>/…` et
   `documents/<doc>/…`. Limite connue : le motif « Maladie » est masqué à
   l'écran pour les membres, mais reste lisible via l'API.
+- Groupes (migration 006) : `conversations.avatar_url / description / admin_ids`,
+  `reads.muted / pinned` (réglages perso), lectures des autres visibles par les
+  membres (« Vu par »). Trigger `protect_conversation` : un non-admin du groupe
+  ne peut qu'épingler des messages ou se retirer. Photos de groupe dans
+  `avatars/groupes/<id>/`. Sourdine = pas de son ni de pastille, @mention notifiée.
 - Mise en production : tester en démo → valider 004 en transaction annulée →
   demander à Jonathan → `db:push` → aperçu Netlify → production.
 

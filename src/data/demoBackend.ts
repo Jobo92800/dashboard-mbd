@@ -27,7 +27,11 @@ function normalize(raw: Partial<Snapshot>): Snapshot {
     reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], ...raw,
   } as Snapshot;
   s.messages = s.messages.map((m) => ({ ...m, reply_to: m.reply_to ?? null, attachments: m.attachments ?? [], edited_at: m.edited_at ?? null }));
-  s.conversations = s.conversations.map((c) => ({ ...c, pinned_ids: c.pinned_ids ?? [] }));
+  s.conversations = s.conversations.map((c) => ({
+    ...c, pinned_ids: c.pinned_ids ?? [], avatar_url: c.avatar_url ?? null, description: c.description ?? '',
+    admin_ids: c.admin_ids ?? (c.created_by ? [c.created_by] : []),
+  }));
+  s.reads = s.reads.map((r) => ({ ...r, muted: r.muted ?? false, pinned: r.pinned ?? false }));
   s.tasks = s.tasks.map((t) => ({ ...t, checklist: t.checklist ?? [], attachments: t.attachments ?? [], recurrence: t.recurrence ?? null }));
   s.profiles = s.profiles.map((p) => ({ ...p, recap_email: p.recap_email ?? true, avatar_url: p.avatar_url ?? null }));
   return s;
@@ -108,7 +112,7 @@ export const demoBackend: Backend = {
     return { path: '', url };
   },
 
-  async uploadAvatar(image) {
+  async uploadAvatar(image, _folder) {
     return new Promise<string>((ok, ko) => {
       const r = new FileReader();
       r.onload = () => ok(r.result as string);

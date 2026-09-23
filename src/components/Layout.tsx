@@ -146,7 +146,7 @@ export function Layout({ children }: { children: ReactNode }) {
  * notification de l'appareil si elle est en arrière-plan. Met aussi la pastille sur l'icône.
  */
 function MessageWatcher() {
-  const { snap, me, byId, loaded, unreadMessages } = useStore();
+  const { snap, me, byId, loaded, unreadMessages, mutedConvs } = useStore();
   const toast = useToast();
   const loc = useLocation();
   const seenMsg = useRef<Set<string> | null>(null);
@@ -160,7 +160,7 @@ function MessageWatcher() {
       if (seenMsg.current.has(m.id)) continue;
       seenMsg.current.add(m.id);
       const url = `/messages/${m.conversation_id}`;
-      if (m.author_id === me?.id) continue;
+      if (m.author_id === me?.id || mutedConvs.has(m.conversation_id)) continue;
       playSound('message');
       if (loc.pathname === url && !away()) continue;
       const who = byId.get(m.author_id)?.full_name.split(' ')[0] ?? 'Quelqu’un';
@@ -168,7 +168,7 @@ function MessageWatcher() {
       if (away()) showSystemNotification(`💬 ${who}`, text, url);
       else toast(`💬 ${who} : ${text.slice(0, 60)}`);
     }
-  }, [snap.messages, loaded, me?.id, byId, loc.pathname, toast]);
+  }, [snap.messages, loaded, me?.id, byId, loc.pathname, toast, mutedConvs]);
 
   useEffect(() => {
     if (!loaded) return;

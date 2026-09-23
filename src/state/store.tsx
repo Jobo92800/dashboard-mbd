@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { backend } from '../data';
 import { uid } from '../data/backend';
 import type { NewMember } from '../data/backend';
-import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, ChecklistItem, Conversation, Doc, Message, Profile, Project, ProjectTemplate, Snapshot, Task, TaskStatus } from '../lib/types';
+import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, ChecklistItem, Conversation, Doc, Message, Profile, Project, ProjectTemplate, ReadMark, Snapshot, Task, TaskStatus } from '../lib/types';
 import { nextOccurrence, shiftIso } from '../lib/recurrence';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useToast } from './toast';
@@ -115,6 +115,13 @@ function useStoreValue() {
     let url = (input.url ?? '').trim();
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     return { id: uid(), name: (input.name ?? '').trim() || url.replace(/^https?:\/\//, '').slice(0, 60), url, kind: 'lien' };
+  };
+
+  /** Mes préférences sur une conversation, en gardant sourdine / épingle existantes. */
+  const myMark = (convId: string, patch: Partial<ReadMark> = {}): ReadMark => {
+    const id = `${convId}:${me!.id}`;
+    const cur = snapRef.current.reads.find((r) => r.id === id);
+    return { id, conversation_id: convId, user_id: me!.id, read_at: cur?.read_at ?? now(), muted: cur?.muted ?? false, pinned: cur?.pinned ?? false, ...patch };
   };
 
   const uploadAll = async (inputs: AttachmentInput[], folder: string, bucket: Bucket) => {
@@ -437,6 +444,7 @@ function useStoreValue() {
         : undefined;
       const conv: Conversation = existing ?? {
         id: uid(), title: cleanTitle, member_ids: members, created_by: me!.id, created_at: now(), last_message_at: now(), pinned_ids: [],
+        avatar_url: null, description: '', admin_ids: cleanTitle ? [me!.id] : members,
       };
       if (!existing) {
         await run((st) => ({ ...st, conversations: [conv, ...st.conversations] }), () => backend.insert('conversations', conv));
@@ -453,7 +461,9 @@ function useStoreValue() {
         id: uid(), conversation_id: conv.id, author_id: me!.id, body: body.trim(), created_at: at,
         reply_to: opts.replyTo ?? null, attachments, edited_at: null,
       };
-      const mark = { id: `${conv.id}:${me!.id}`, conversation_id: conv.id, user_id: me!.id, read_at: at };
+      const mark = myMark(conv.id, { read_at: at });
+      const mentioned = mentionedIn(body).filter((id) => conv.member_ids.includes(id));
+      const where = conv.title ? `« ${conv.title} »` : 'un message privé';
       return run(
         (st) => ({
           ...st,
@@ -465,6 +475,7 @@ function useStoreValue() {
           await backend.insert('messages', msg);
           await backend.update('conversations', conv.id, { last_message_at: at });
           await backend.upsert('reads', mark);
+          await notify(mentioned, `💬 ${firstName(me!.id)} t’a mentionné(e) dans ${where}`, `/messages/${conv.id}`);
         },
       );
     },
@@ -619,8 +630,89 @@ function useStoreValue() {
     },
 
     markConversationRead(convId: string) {
-      const mark = { id: `${convId}:${me!.id}`, conversation_id: convId, user_id: me!.id, read_at: now() };
+      const mark = myMark(convId, { read_at: now() });
       return run((st) => ({ ...st, reads: [...st.reads.filter((r) => r.id !== mark.id), mark] }), () => backend.upsert('reads', mark));
+    },
+
+    /** Sourdine, épingle en haut de liste : réglages personnels. */
+    setConversationPref(convId: string, patch: { muted?: boolean; pinned?: boolean }) {
+      const mark = myMark(convId, patch);
+      const text = patch.muted !== undefined ? (patch.muted ? 'Conversation en sourdine' : 'Sourdine retirée') : patch.pinned ? 'Épinglée en haut' : 'Désépinglée';
+      return run((st) => ({ ...st, reads: [...st.reads.filter((r) => r.id !== mark.id), mark] }), () => backend.upsert('reads', mark), text);
+    },
+
+    /** Remet le dernier message des autres en « non lu ». */
+    markConversationUnread(convId: string) {
+      const lastOther = snapRef.current.messages
+        .filter((m) => m.conversation_id === convId && m.author_id !== me!.id)
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+      if (!lastOther) return Promise.resolve();
+      const mark = myMark(convId, { read_at: new Date(Date.parse(lastOther.created_at) - 1000).toISOString() });
+      return run((st) => ({ ...st, reads: [...st.reads.filter((r) => r.id !== mark.id), mark] }), () => backend.upsert('reads', mark), 'Marquée comme non lue');
+    },
+
+    async createGroup(g: { title: string; description: string; memberIds: string[]; photo?: File | null }) {
+      const conv: Conversation = {
+        id: uid(), title: g.title.trim(), description: g.description.trim(), member_ids: [...new Set([me!.id, ...g.memberIds])],
+        admin_ids: [me!.id], avatar_url: null, pinned_ids: [], created_by: me!.id, created_at: now(), last_message_at: now(),
+      };
+      await run(
+        (st) => ({ ...st, conversations: [conv, ...st.conversations] }),
+        async () => {
+          await backend.insert('conversations', conv);
+          await notify(conv.member_ids, `👥 ${firstName(me!.id)} t’a ajouté(e) au groupe « ${conv.title} »`, `/messages/${conv.id}`);
+        },
+        'Groupe créé',
+      );
+      if (g.photo) {
+        try { await actions.setGroupPhoto(conv, g.photo); } catch (e) { toast((e as Error).message, 'erreur'); }
+      }
+      return conv.id;
+    },
+
+    async setGroupPhoto(conv: Conversation, file: File | null) {
+      let avatar_url: string | null = null;
+      if (file) {
+        const { squareAvatar } = await import('../lib/image');
+        avatar_url = await backend.uploadAvatar(await squareAvatar(file), `groupes/${conv.id}`);
+      }
+      const current = snapRef.current.conversations.find((c) => c.id === conv.id) ?? conv;
+      return actions.updateConversation(current, { avatar_url }, file ? 'Photo du groupe mise à jour' : 'Photo retirée');
+    },
+
+    addGroupMembers(conv: Conversation, ids: string[]) {
+      const current = snapRef.current.conversations.find((c) => c.id === conv.id) ?? conv;
+      const fresh = ids.filter((id) => !current.member_ids.includes(id));
+      return run(
+        (st) => ({ ...st, conversations: st.conversations.map((c) => (c.id === conv.id ? { ...c, member_ids: [...c.member_ids, ...fresh] } : c)) }),
+        async () => {
+          await backend.update('conversations', conv.id, { member_ids: [...current.member_ids, ...fresh] });
+          await notify(fresh, `👥 ${firstName(me!.id)} t’a ajouté(e) au groupe « ${current.title ?? 'Conversation'} »`, `/messages/${conv.id}`);
+        },
+        fresh.length > 1 ? `${fresh.length} personnes ajoutées` : 'Personne ajoutée',
+      );
+    },
+
+    removeGroupMember(conv: Conversation, userId: string) {
+      const current = snapRef.current.conversations.find((c) => c.id === conv.id) ?? conv;
+      const patch = { member_ids: current.member_ids.filter((x) => x !== userId), admin_ids: current.admin_ids.filter((x) => x !== userId) };
+      return actions.updateConversation(current, patch, `${firstName(userId)} a été retiré(e) du groupe`);
+    },
+
+    toggleGroupAdmin(conv: Conversation, userId: string) {
+      const current = snapRef.current.conversations.find((c) => c.id === conv.id) ?? conv;
+      const isAdm = current.admin_ids.includes(userId);
+      if (isAdm && current.admin_ids.length <= 1) { toast('Le groupe doit garder au moins un administrateur.', 'erreur'); return Promise.resolve(); }
+      const admin_ids = isAdm ? current.admin_ids.filter((x) => x !== userId) : [...current.admin_ids, userId];
+      return actions.updateConversation(current, { admin_ids }, isAdm ? `${firstName(userId)} n’est plus admin du groupe` : `${firstName(userId)} est admin du groupe`);
+    },
+
+    deleteConversation(conv: Conversation) {
+      return run(
+        (st) => ({ ...st, conversations: st.conversations.filter((c) => c.id !== conv.id), messages: st.messages.filter((m) => m.conversation_id !== conv.id) }),
+        () => backend.remove('conversations', conv.id),
+        conv.title ? 'Groupe supprimé' : 'Conversation supprimée',
+      );
     },
 
     updateConversation(conv: Conversation, patch: Partial<Conversation>, okText?: string) {
@@ -633,9 +725,12 @@ function useStoreValue() {
 
     leaveConversation(conv: Conversation) {
       const rest = conv.member_ids.filter((id) => id !== me!.id);
+      // Si je suis le dernier admin, le rôle passe au plus ancien membre restant.
+      let admins = conv.admin_ids.filter((id) => id !== me!.id && rest.includes(id));
+      if (!admins.length && rest.length) admins = [rest[0]];
       return run(
         (st) => ({ ...st, conversations: st.conversations.filter((c) => c.id !== conv.id), messages: st.messages.filter((m) => m.conversation_id !== conv.id) }),
-        () => (rest.length ? backend.update('conversations', conv.id, { member_ids: rest }) : backend.remove('conversations', conv.id)),
+        () => (rest.length ? backend.update('conversations', conv.id, { member_ids: rest, admin_ids: admins }) : backend.remove('conversations', conv.id)),
         'Conversation quittée',
       );
     },
@@ -665,7 +760,12 @@ function useStoreValue() {
     }
     return out;
   }, [snap.messages, snap.reads, me]);
-  const unreadMessages = [...unreadByConv.values()].reduce((a, b) => a + b, 0);
+  /** Conversations en sourdine : pas comptées dans les pastilles du menu. */
+  const mutedConvs = useMemo(
+    () => new Set(snap.reads.filter((r) => r.user_id === me?.id && r.muted).map((r) => r.conversation_id)),
+    [snap.reads, me],
+  );
+  const unreadMessages = [...unreadByConv.entries()].filter(([id]) => !mutedConvs.has(id)).reduce((a, [, n]) => a + n, 0);
 
   const unreadAnnouncements = useMemo(() => {
     if (!me) return [];
@@ -673,7 +773,7 @@ function useStoreValue() {
     return snap.announcements.filter((x) => !read.has(x.id));
   }, [snap.announcements, snap.announcement_reads, me]);
 
-  return { me, booting, loaded, snap, byId, unreadByConv, unreadMessages, unreadAnnouncements, recovery, setRecovery, mode: backend.mode, reload, ...actions };
+  return { me, booting, loaded, snap, byId, unreadByConv, unreadMessages, mutedConvs, unreadAnnouncements, recovery, setRecovery, mode: backend.mode, reload, ...actions };
 }
 
 function escapeRe(s: string) {

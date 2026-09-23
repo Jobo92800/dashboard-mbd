@@ -38,7 +38,7 @@ export function visibleFor(me: Profile, s: Snapshot): Snapshot {
     notifications: s.notifications.filter((n) => n.user_id === me.id),
     conversations: convs,
     messages: s.messages.filter((m) => convIds.has(m.conversation_id)),
-    reads: s.reads.filter((r) => r.user_id === me.id),
+    reads: s.reads.filter((r) => convIds.has(r.conversation_id)), // « Vu par » : lectures des autres membres
     reactions: s.reactions.filter((r) => s.messages.some((m) => m.id === r.message_id && convIds.has(m.conversation_id))),
     docs: isAdmin(me) ? s.docs : s.docs.filter((d) => !d.admins_only),
   };
