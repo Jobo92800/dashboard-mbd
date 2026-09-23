@@ -25,6 +25,7 @@ export default function Tasks() {
   const [showDone, setShowDone] = useState(false);
 
   useEffect(() => {
+    if (params.get('nouvelle')) { setDraft({}); params.delete('nouvelle'); setParams(params, { replace: true }); return; }
     const tid = params.get('tache');
     const t = tid && snap.tasks.find((x) => x.id === tid);
     if (t) { setDraft(t); params.delete('tache'); setParams(params, { replace: true }); }

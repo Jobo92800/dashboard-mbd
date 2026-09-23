@@ -9,7 +9,11 @@ function clean<T extends object>(row: T): T {
   return out as unknown as T;
 }
 
-const TABLES: Table[] = ['profiles', 'projects', 'tasks', 'comments', 'events', 'notifications', 'activity', 'conversations', 'messages', 'reads'];
+const TABLES: Table[] = [
+  'profiles', 'projects', 'tasks', 'comments', 'events', 'notifications', 'activity',
+  'conversations', 'messages', 'reads', 'task_comments', 'templates',
+];
+const BUCKET = 'pieces-jointes';
 
 export function makeSupabaseBackend(url: string, anonKey: string): Backend {
   const sb: SupabaseClient = createClient(url, anonKey);
@@ -82,12 +86,35 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
       check((await sb.from(table).update(clean(patch as Record<string, unknown>)).eq('id', id)).error);
     },
 
+    async insertMany(table, rows) {
+      if (rows.length) check((await sb.from(table).insert(rows.map(clean))).error);
+    },
+
+    async uploadFile(file, folder) {
+      if (file.size > 20 * 1024 * 1024) throw new Error('Fichier trop lourd (20 Mo maximum).');
+      const safe = file.name.normalize('NFD').replace(/[^\w.-]+/g, '_');
+      const path = `${folder}/${Date.now()}-${safe}`;
+      check((await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type })).error);
+      return { path, url: '' };
+    },
+
+    async fileUrl(path) {
+      const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(path, 60 * 10);
+      check(error);
+      return data!.signedUrl;
+    },
+
     async upsert(table, row) {
       check((await sb.from(table).upsert(clean(row))).error);
     },
 
     async remove(table, id) {
       check((await sb.from(table).delete().eq('id', id)).error);
+    },
+
+    async accessToken() {
+      const { data } = await sb.auth.getSession();
+      return data.session?.access_token ?? '';
     },
 
     async inviteMember(m) {

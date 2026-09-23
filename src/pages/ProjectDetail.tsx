@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Archive, ArrowLeft, CheckCheck, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Archive, ArrowLeft, CheckCheck, Copy, LayoutTemplate, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../state/store';
 import type { Task, TaskStatus } from '../lib/types';
 import { daysUntil, fmtShort, fmtStamp } from '../lib/dates';
 import { isDone, isLate, progress, projectHealth, sortTasks } from '../lib/selectors';
 import { isAdmin, isProjectMember } from '../lib/permissions';
-import { TaskRow, StatusCheck } from '../components/TaskRow';
+import { TaskRow, StatusCheck, TaskMeta } from '../components/TaskRow';
 import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { ProjectModal } from '../components/ProjectModal';
+import { DuplicateModal, SaveTemplateModal } from '../components/TemplateModals';
 import { Comments } from '../components/Comments';
 import { Avatar, AvatarStack, Badge, Button, Card, Empty, Progress, Surtitre, Tabs } from '../components/ui';
 
@@ -22,6 +23,8 @@ export default function ProjectDetail() {
   const [view, setView] = useState<View>(() => (localStorage.getItem('mahq_vue_projet') as View) || 'roadmap');
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const [editing, setEditing] = useState(false);
+  const [dup, setDup] = useState(false);
+  const [asTpl, setAsTpl] = useState(false);
   const [person, setPerson] = useState('');
   const [hideDone, setHideDone] = useState(false);
 
@@ -70,6 +73,8 @@ export default function ProjectDetail() {
           {admin && (
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => setEditing(true)}><Pencil size={15} /> Modifier</Button>
+              <Button variant="discret" onClick={() => setDup(true)}><Copy size={15} /> Dupliquer</Button>
+              <Button variant="discret" onClick={() => setAsTpl(true)}><LayoutTemplate size={15} /> En faire un modèle</Button>
               {project.status === 'en_cours' && pr.total > 0 && pr.done === pr.total && (
                 <Button onClick={() => saveProject({ ...project, status: 'termine' })}><CheckCheck size={15} /> Clôturer</Button>
               )}
@@ -157,6 +162,8 @@ export default function ProjectDetail() {
 
       <TaskModal draft={draft} onClose={() => setDraft(null)} />
       <ProjectModal open={editing} project={project} onClose={() => setEditing(false)} />
+      <DuplicateModal open={dup} project={project} onClose={() => setDup(false)} />
+      <SaveTemplateModal open={asTpl} project={project} onClose={() => setAsTpl(false)} />
     </>
   );
 }
@@ -221,7 +228,7 @@ function Kanban({ tasks, onEdit, canEdit }: { tasks: Task[]; onEdit: (t: Task) =
                     <p className={`flex-1 text-sm ${isDone(t) ? 'text-mab-gris-doux line-through' : ''}`}>{t.title}</p>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-mab-texte">
-                    <span className={isLate(t) ? 'font-semibold text-mab-erreur' : ''}>{fmtShort(t.due_date)}</span>
+                    <span className="flex items-center gap-2.5"><span className={isLate(t) ? 'font-semibold text-mab-erreur' : ''}>{fmtShort(t.due_date)}</span><TaskMeta task={t} /></span>
                     <Avatar p={byId.get(t.assignee_id ?? '')} size={22} />
                   </div>
                 </div>

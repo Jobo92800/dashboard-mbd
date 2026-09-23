@@ -1,19 +1,23 @@
 import { useRef, useState } from 'react';
 import { Send, Trash2 } from 'lucide-react';
-import type { Project } from '../lib/types';
+import type { Profile, Project } from '../lib/types';
 import { useStore } from '../state/store';
 import { fmtStamp } from '../lib/dates';
 import { isAdmin } from '../lib/permissions';
 import { Avatar, Button, IconButton } from './ui';
 
-export function Comments({ project }: { project: Project }) {
-  const { snap, byId, me, addComment, deleteComment } = useStore();
+type Item = { id: string; author_id: string; body: string; created_at: string };
+
+/** Fil de discussion avec @mentions (projets et tâches). */
+export function Discussion({ items, people, onSend, onDelete, empty, compact = false }: {
+  items: Item[]; people: Profile[]; onSend: (body: string) => void; onDelete: (id: string) => void; empty: string; compact?: boolean;
+}) {
+  const { byId, me } = useStore();
   const [text, setText] = useState('');
   const [mention, setMention] = useState<{ q: string; start: number } | null>(null);
   const [active, setActive] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
-  const list = snap.comments.filter((c) => c.project_id === project.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
-  const people = snap.profiles.filter((p) => p.active && (project.member_ids.includes(p.id) || p.role === 'admin'));
+  const list = [...items].sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
   const suggestions = mention ? people.filter((p) => p.full_name.toLowerCase().startsWith(mention.q.toLowerCase())).slice(0, 6) : [];
 
   const onChange = (v: string, caret: number) => {
@@ -32,10 +36,9 @@ export function Comments({ project }: { project: Project }) {
   };
   const send = () => {
     if (!text.trim()) return;
-    addComment(project, text.trim());
+    onSend(text.trim());
     setText('');
   };
-
   const render = (body: string) =>
     body.split(/(@[\p{L}-]+)/u).map((part, i) =>
       part.startsWith('@') && people.some((p) => p.full_name.split(' ')[0].toLowerCase() === part.slice(1).toLowerCase())
@@ -45,19 +48,19 @@ export function Comments({ project }: { project: Project }) {
 
   return (
     <div>
-      <div className="grid gap-4">
-        {list.length === 0 && <p className="text-sm text-mab-texte">Pas encore d’échange. Utilise @prénom pour prévenir quelqu’un.</p>}
+      <div className={`grid ${compact ? 'gap-3' : 'gap-4'}`}>
+        {list.length === 0 && <p className="text-sm text-mab-texte">{empty}</p>}
         {list.map((c) => {
           const author = byId.get(c.author_id);
           return (
             <div key={c.id} className="group flex gap-3">
-              <Avatar p={author} size={32} />
+              <Avatar p={author} size={compact ? 28 : 32} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm"><b>{author?.full_name ?? '—'}</b> <span className="text-xs text-mab-gris-doux">{fmtStamp(c.created_at)}</span></p>
                 <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px] text-mab-encre">{render(c.body)}</p>
               </div>
               {(c.author_id === me!.id || isAdmin(me)) && (
-                <IconButton label="Supprimer le message" className="opacity-0 group-hover:opacity-100" onClick={() => confirm('Supprimer ce message ?') && deleteComment(c.id)}>
+                <IconButton label="Supprimer le message" className="opacity-0 group-hover:opacity-100" onClick={() => confirm('Supprimer ce message ?') && onDelete(c.id)}>
                   <Trash2 size={14} />
                 </IconButton>
               )}
@@ -65,10 +68,10 @@ export function Comments({ project }: { project: Project }) {
           );
         })}
       </div>
-      <div className="relative mt-5">
+      <div className="relative mt-4">
         <textarea
           ref={ref}
-          rows={3}
+          rows={compact ? 2 : 3}
           value={text}
           onChange={(e) => onChange(e.target.value, e.target.selectionStart)}
           onKeyDown={(e) => {
@@ -76,7 +79,7 @@ export function Comments({ project }: { project: Project }) {
               if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => (a + 1) % suggestions.length); return; }
               if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => (a - 1 + suggestions.length) % suggestions.length); return; }
               if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insert(suggestions[active].full_name); return; }
-              if (e.key === 'Escape') { setMention(null); return; }
+              if (e.key === 'Escape') { e.stopPropagation(); setMention(null); return; }
             }
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
           }}
@@ -86,7 +89,7 @@ export function Comments({ project }: { project: Project }) {
         {suggestions.length > 0 && (
           <div className="absolute bottom-full left-0 z-10 mb-1 w-60 rounded-mab-champ border border-mab-filet bg-white p-1 shadow-mab-flottante">
             {suggestions.map((p, i) => (
-              <button key={p.id} onMouseDown={(e) => { e.preventDefault(); insert(p.full_name); }} className={`flex w-full items-center gap-2 rounded-mab-etiquette px-2 py-1.5 text-left text-sm ${i === active ? 'bg-mab-wash-2' : ''}`}>
+              <button key={p.id} type="button" onMouseDown={(e) => { e.preventDefault(); insert(p.full_name); }} className={`flex w-full items-center gap-2 rounded-mab-etiquette px-2 py-1.5 text-left text-sm ${i === active ? 'bg-mab-wash-2' : ''}`}>
                 <Avatar p={p} size={22} /> {p.full_name}
               </button>
             ))}
@@ -98,5 +101,19 @@ export function Comments({ project }: { project: Project }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export function Comments({ project }: { project: Project }) {
+  const { snap, addComment, deleteComment } = useStore();
+  const people = snap.profiles.filter((p) => p.active && (project.member_ids.includes(p.id) || p.role === 'admin'));
+  return (
+    <Discussion
+      items={snap.comments.filter((c) => c.project_id === project.id)}
+      people={people}
+      onSend={(body) => addComment(project, body)}
+      onDelete={deleteComment}
+      empty="Pas encore d’échange. Utilise @prénom pour prévenir quelqu’un."
+    />
   );
 }

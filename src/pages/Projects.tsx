@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { addDays, differenceInCalendarDays, parseISO, startOfWeek, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CalendarRange, FolderPlus, LayoutGrid } from 'lucide-react';
+import { CalendarRange, FolderPlus, LayoutGrid, LayoutTemplate } from 'lucide-react';
 import { useStore } from '../state/store';
-import type { Project, ProjectStatus } from '../lib/types';
+import type { Project, ProjectStatus, ProjectTemplate } from '../lib/types';
+import { TemplatesModal } from '../components/TemplateModals';
 import { daysUntil, fmtShort, todayIso } from '../lib/dates';
 import { isDone, isLate, progress, projectHealth } from '../lib/selectors';
 import { isAdmin } from '../lib/permissions';
@@ -19,6 +20,8 @@ export default function Projects() {
   const [view, setView] = useState<'cartes' | 'chronologie'>('cartes');
   const [creating, setCreating] = useState(false);
   const [person, setPerson] = useState<string>('');
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [useTpl, setUseTpl] = useState<ProjectTemplate | null>(null);
 
   const counts = (s: ProjectStatus) => snap.projects.filter((p) => p.status === s).length;
   const list = snap.projects
@@ -33,7 +36,8 @@ export default function Projects() {
   return (
     <>
       <PageTitle title={<>Projets <b>en cours</b></>} sub="Piloter les missions et savoir qui fait quoi.">
-        {isAdmin(me) && <Button variant="primaire" onClick={() => setCreating(true)}><FolderPlus size={17} /> Créer un projet</Button>}
+        {isAdmin(me) && <Button onClick={() => setTemplatesOpen(true)}><LayoutTemplate size={16} /> Modèles{snap.templates.length ? ` · ${snap.templates.length}` : ''}</Button>}
+        {isAdmin(me) && <Button variant="primaire" onClick={() => { setUseTpl(null); setCreating(true); }}><FolderPlus size={17} /> Créer un projet</Button>}
       </PageTitle>
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -72,7 +76,8 @@ export default function Projects() {
 
       {tab === 'en_cours' && <WhoDoesWhat />}
 
-      <ProjectModal open={creating} onClose={() => setCreating(false)} />
+      <ProjectModal open={creating} initialTemplate={useTpl} onClose={() => setCreating(false)} />
+      <TemplatesModal open={templatesOpen} onClose={() => setTemplatesOpen(false)} onUse={(t) => { setUseTpl(t); setCreating(true); }} />
     </>
   );
 }

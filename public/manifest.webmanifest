@@ -1,0 +1,21 @@
+{
+  "name": "MA HQ · Pilotage MAbeautyplus",
+  "short_name": "MA HQ",
+  "description": "Projets, tâches, agenda et messagerie de l’équipe MAbeautyplus.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4fbfb",
+  "theme_color": "#0f4344",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Ma journée", "url": "/" },
+    { "name": "Messages", "url": "/messages" },
+    { "name": "Nouvelle tâche", "url": "/taches?nouvelle=1" }
+  ]
+}

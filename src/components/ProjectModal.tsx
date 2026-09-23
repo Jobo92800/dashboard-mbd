@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Project, ProjectStatus } from '../lib/types';
+import type { Project, ProjectStatus, ProjectTemplate } from '../lib/types';
+import { FromTemplateForm } from './TemplateModals';
 import { useStore } from '../state/store';
 import { nextColor, PROJECT_COLORS } from '../lib/palette';
 import { todayIso } from '../lib/dates';
@@ -13,12 +14,13 @@ const TEMPLATES: Record<string, string[]> = {
   'Campagne marketing': ['Brief', 'Création', 'Tracking', 'Lancement', 'Analyse'],
 };
 
-export function ProjectModal({ project, open, onClose }: { project?: Project; open: boolean; onClose: () => void }) {
+export function ProjectModal({ project, open, onClose, initialTemplate }: { project?: Project; open: boolean; onClose: () => void; initialTemplate?: ProjectTemplate | null }) {
   const { snap, me, saveProject } = useStore();
   const nav = useNavigate();
   const [p, setP] = useState<Partial<Project>>({});
   const [template, setTemplate] = useState('Standard');
   const [phasesText, setPhasesText] = useState('');
+  const [source, setSource] = useState<string>('vierge');
 
   useEffect(() => {
     if (!open) return;
@@ -29,9 +31,12 @@ export function ProjectModal({ project, open, onClose }: { project?: Project; op
     setP(base);
     setPhasesText((project?.phases ?? TEMPLATES.Standard).join('\n'));
     setTemplate('Standard');
-  }, [open, project, me, snap.projects]);
+    setSource(initialTemplate?.id ?? 'vierge');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, project, initialTemplate]);
 
   if (!open) return null;
+  const chosen = snap.templates.find((t) => t.id === source);
   const set = (patch: Partial<Project>) => setP((x) => ({ ...x, ...patch }));
   const datesOk = !p.start_date || !p.end_date || p.start_date <= p.end_date;
   const valid = !!p.name?.trim() && datesOk;
@@ -50,13 +55,32 @@ export function ProjectModal({ project, open, onClose }: { project?: Project; op
       wide
       onClose={onClose}
       title={project ? 'Modifier le projet' : 'Créer un projet'}
-      footer={
+      footer={chosen ? undefined : (
         <>
           <Button variant="tertiaire" onClick={onClose}>Annuler</Button>
           <Button variant="primaire" disabled={!valid} onClick={submit}>{project ? 'Enregistrer' : 'Créer le projet'}</Button>
         </>
-      }
+      )}
     >
+      {!project && snap.templates.length > 0 && (
+        <div className="mb-5">
+          <span className="mb-1.5 block text-sm font-medium text-mab-encre">Partir de</span>
+          <div className="flex flex-wrap gap-2">
+            {[{ id: 'vierge', name: 'Projet vierge' }, ...snap.templates].map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={source === t.id}
+                onClick={() => setSource(t.id)}
+                className={`rounded-mab-pilule border px-4 py-1.5 text-sm transition ${source === t.id ? 'border-mab-aqua bg-mab-wash-2 font-semibold text-mab-encre' : 'border-mab-filet text-mab-texte hover:border-mab-filet-aqua'}`}
+              >
+                {t.id === 'vierge' ? t.name : `Modèle · ${t.name}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {chosen ? <FromTemplateForm tpl={chosen} onDone={onClose} /> : (
       <div className="grid gap-4">
         <Field label="Nom du projet">
           <Input autoFocus value={p.name ?? ''} onChange={(e) => set({ name: e.target.value })} placeholder="Ex. Webinaire d’octobre" />
@@ -112,6 +136,7 @@ export function ProjectModal({ project, open, onClose }: { project?: Project; op
           </Field>
         </div>
       </div>
+      )}
     </Modal>
   );
 }

@@ -9,6 +9,7 @@ import { resetDemo } from '../data/demoBackend';
 import { AvailDot, Avatar, IconButton } from './ui';
 import { SearchPalette } from './SearchPalette';
 import { useToast } from '../state/toast';
+import { setAppBadge, showSystemNotification, useInstall } from '../lib/device';
 
 export function Layout({ children }: { children: ReactNode }) {
   const { me, snap, mode, loaded, unreadMessages } = useStore();
@@ -72,6 +73,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </>
       )}
       <div className="mt-auto">
+        <InstallHint />
         {mode === 'demo' && (
           <div className="mb-3 rounded-mab-champ border border-white/15 p-3 text-xs text-mab-profond-texte">
             <b className="text-white">Mode démo.</b> Les données restent dans ce navigateur.
@@ -133,24 +135,59 @@ export function Layout({ children }: { children: ReactNode }) {
   );
 }
 
-/** Prévient d'un message reçu quand on n'est pas déjà dans la conversation. */
+/**
+ * Prévient de ce qui arrive : bandeau dans l'appli si on la regarde,
+ * notification de l'appareil si elle est en arrière-plan. Met aussi la pastille sur l'icône.
+ */
 function MessageWatcher() {
-  const { snap, me, byId, loaded } = useStore();
+  const { snap, me, byId, loaded, unreadMessages } = useStore();
   const toast = useToast();
   const loc = useLocation();
-  const seen = useRef<Set<string> | null>(null);
+  const seenMsg = useRef<Set<string> | null>(null);
+  const seenNotif = useRef<Set<string> | null>(null);
+  const away = () => document.hidden || !document.hasFocus();
+
   useEffect(() => {
     if (!loaded) return;
-    if (!seen.current) { seen.current = new Set(snap.messages.map((m) => m.id)); return; }
+    if (!seenMsg.current) { seenMsg.current = new Set(snap.messages.map((m) => m.id)); return; }
     for (const m of snap.messages) {
-      if (seen.current.has(m.id)) continue;
-      seen.current.add(m.id);
-      if (m.author_id === me?.id || loc.pathname === `/messages/${m.conversation_id}`) continue;
+      if (seenMsg.current.has(m.id)) continue;
+      seenMsg.current.add(m.id);
+      const url = `/messages/${m.conversation_id}`;
+      if (m.author_id === me?.id || (loc.pathname === url && !away())) continue;
       const who = byId.get(m.author_id)?.full_name.split(' ')[0] ?? 'Quelqu’un';
-      toast(`💬 ${who} : ${m.body.length > 60 ? m.body.slice(0, 60) + '…' : m.body}`);
+      const text = m.body.length > 90 ? m.body.slice(0, 90) + '…' : m.body;
+      if (away()) showSystemNotification(`💬 ${who}`, text, url);
+      else toast(`💬 ${who} : ${text.slice(0, 60)}`);
     }
   }, [snap.messages, loaded, me?.id, byId, loc.pathname, toast]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (!seenNotif.current) { seenNotif.current = new Set(snap.notifications.map((n) => n.id)); return; }
+    for (const n of snap.notifications) {
+      if (seenNotif.current.has(n.id)) continue;
+      seenNotif.current.add(n.id);
+      if (n.read) continue;
+      if (away()) showSystemNotification('MA HQ', n.text, n.link ?? '/');
+      else toast(`🔔 ${n.text}`);
+    }
+  }, [snap.notifications, loaded, toast]);
+
+  const unreadNotifs = snap.notifications.filter((n) => !n.read).length;
+  useEffect(() => { setAppBadge(unreadMessages + unreadNotifs); }, [unreadMessages, unreadNotifs]);
   return null;
+}
+
+function InstallHint() {
+  const inst = useInstall();
+  if (inst.installed || (!inst.canPrompt && !inst.ios)) return null;
+  return (
+    <Link to="/profil#appareil" className="mb-3 block rounded-mab-champ bg-white/10 p-3 text-xs text-mab-profond-texte hover:bg-white/15">
+      <b className="block text-sm text-white">📱 Installer l’appli</b>
+      Une icône MA HQ sur ton écran d’accueil, et les notifications.
+    </Link>
+  );
 }
 
 function Notifications() {

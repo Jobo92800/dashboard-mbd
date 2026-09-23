@@ -9,7 +9,8 @@
    "role": "membre",
    "active": true,
    "availability": "disponible",
-   "availability_note": "Disponible"
+   "availability_note": "Disponible",
+   "recap_email": true
   },
   {
    "id": "u-leslie",
@@ -20,7 +21,8 @@
    "role": "membre",
    "active": true,
    "availability": "occupe",
-   "availability_note": "En création de contenus"
+   "availability_note": "En création de contenus",
+   "recap_email": true
   },
   {
    "id": "u-elisa",
@@ -31,7 +33,8 @@
    "role": "membre",
    "active": true,
    "availability": "disponible",
-   "availability_note": "Joignable"
+   "availability_note": "Joignable",
+   "recap_email": true
   },
   {
    "id": "u-flora",
@@ -42,7 +45,8 @@
    "role": "membre",
    "active": true,
    "availability": "absent",
-   "availability_note": "En consultation jusqu’à 15h"
+   "availability_note": "En consultation jusqu’à 15h",
+   "recap_email": true
   },
   {
    "id": "u-jo",
@@ -53,7 +57,8 @@
    "role": "admin",
    "active": true,
    "availability": "disponible",
-   "availability_note": "Disponible rapidement"
+   "availability_note": "Disponible rapidement",
+   "recap_email": true
   },
   {
    "id": "u-nico",
@@ -64,7 +69,8 @@
    "role": "admin",
    "active": true,
    "availability": "occupe",
-   "availability_note": "En tournage / montage"
+   "availability_note": "En tournage / montage",
+   "recap_email": true
   }
  ],
  "projects": [
@@ -245,7 +251,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": "2026-09-22T09:00:00.000Z"
+   "done_at": "2026-09-22T09:00:00.000Z",
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w02",
@@ -261,7 +270,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w03",
@@ -277,7 +289,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w04",
@@ -293,7 +308,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w05",
@@ -309,7 +327,33 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [
+    {
+     "id": "k4",
+     "text": "Hero + promesse",
+     "done": true
+    },
+    {
+     "id": "k5",
+     "text": "Formulaire relié à Airtable",
+     "done": false
+    },
+    {
+     "id": "k6",
+     "text": "Test mobile",
+     "done": false
+    }
+   ],
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "Maquette landing (Canva)",
+     "url": "https://www.canva.com/",
+     "kind": "lien"
+    }
+   ],
+   "recurrence": null
   },
   {
    "id": "t-w06",
@@ -325,7 +369,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w07",
@@ -341,7 +388,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w08",
@@ -357,7 +407,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w09",
@@ -373,7 +426,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w10",
@@ -389,7 +445,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w11",
@@ -405,7 +464,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w12",
@@ -421,7 +483,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w13",
@@ -437,7 +502,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w14",
@@ -453,7 +521,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w15",
@@ -469,7 +540,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w16",
@@ -485,7 +559,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w17",
@@ -501,7 +578,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w18",
@@ -517,7 +597,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w19",
@@ -533,7 +616,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w20",
@@ -549,7 +635,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w21",
@@ -565,7 +654,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w22",
@@ -581,7 +673,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w23",
@@ -597,7 +692,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w24",
@@ -613,7 +711,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w25",
@@ -629,7 +730,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w26",
@@ -645,7 +749,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w27",
@@ -661,7 +768,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w28",
@@ -677,7 +787,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w29",
@@ -693,7 +806,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w30",
@@ -709,7 +825,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w31",
@@ -725,7 +844,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w32",
@@ -741,7 +863,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w33",
@@ -757,7 +882,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w34",
@@ -773,7 +901,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w35",
@@ -789,7 +920,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-w36",
@@ -805,7 +939,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-rf1",
@@ -821,7 +958,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-rf2",
@@ -837,7 +977,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-rf3",
@@ -853,7 +996,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-rf4",
@@ -869,7 +1015,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-rf5",
@@ -885,7 +1034,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-wa1",
@@ -901,7 +1053,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": "2026-09-22T09:00:00.000Z"
+   "done_at": "2026-09-22T09:00:00.000Z",
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-wa2",
@@ -917,7 +1072,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-wa3",
@@ -933,7 +1091,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-wa4",
@@ -949,7 +1110,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-b1",
@@ -965,7 +1129,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-b2",
@@ -981,7 +1148,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-b3",
@@ -997,7 +1167,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-b4",
@@ -1013,7 +1186,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-m1",
@@ -1029,7 +1205,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": "2026-09-22T09:00:00.000Z"
+   "done_at": "2026-09-22T09:00:00.000Z",
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-m2",
@@ -1045,7 +1224,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": "2026-09-22T09:00:00.000Z"
+   "done_at": "2026-09-22T09:00:00.000Z",
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-m3",
@@ -1061,7 +1243,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-m4",
@@ -1077,7 +1262,10 @@
    "centre": null,
    "created_by": "u-nico",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-q1",
@@ -1093,7 +1281,10 @@
    "centre": null,
    "created_by": "u-jo",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
   },
   {
    "id": "t-q2",
@@ -1109,7 +1300,26 @@
    "centre": null,
    "created_by": "u-jo",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [
+    {
+     "id": "k1",
+     "text": "Faire l’inventaire des consommables",
+     "done": true
+    },
+    {
+     "id": "k2",
+     "text": "Comparer avec le stock minimum",
+     "done": false
+    },
+    {
+     "id": "k3",
+     "text": "Passer la commande fournisseur",
+     "done": false
+    }
+   ],
+   "attachments": [],
+   "recurrence": "mensuelle"
   },
   {
    "id": "t-q3",
@@ -1125,7 +1335,29 @@
    "centre": null,
    "created_by": "u-jo",
    "created_at": "2026-09-22T09:00:00.000Z",
-   "done_at": null
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": null
+  },
+  {
+   "id": "t-rec-point",
+   "project_id": null,
+   "phase": null,
+   "title": "Préparer le point hebdo direction",
+   "note": "Ordre du jour : chiffres de la semaine, projets à risque, décisions.",
+   "assignee_id": "u-nico",
+   "due_date": "2026-09-28",
+   "priority": "Moyenne",
+   "status": "a_faire",
+   "kind": "Administratif",
+   "centre": null,
+   "created_by": "u-nico",
+   "created_at": "2026-09-22T09:00:00.000Z",
+   "done_at": null,
+   "checklist": [],
+   "attachments": [],
+   "recurrence": "hebdomadaire"
   }
  ],
  "comments": [
@@ -1283,5 +1515,369 @@
    "created_at": "2026-09-23T09:05:00.000Z"
   }
  ],
- "reads": []
+ "reads": [],
+ "task_comments": [
+  {
+   "id": "tc1",
+   "task_id": "t-w05",
+   "author_id": "u-nico",
+   "body": "Garde bien la promesse validée ce matin dans le hero.",
+   "created_at": "2026-09-23T10:15:00.000Z"
+  }
+ ],
+ "templates": [
+  {
+   "id": "tpl-webinaire",
+   "name": "Webinaire MAbeautyplus",
+   "description": "Préparer, promouvoir, diffuser et analyser la masterclass MAbeautyplus. Live exemple : 09/10 à 12h30. Objectif : générer des rendez-vous de qualification après le webinaire.",
+   "reference_label": "Jour du live",
+   "start_offset": -16,
+   "end_offset": 3,
+   "phases": [
+    "1 · Cadrage",
+    "2 · Acquisition",
+    "3 · Séquence pré-live",
+    "4 · Contenu du live",
+    "5 · Pré-live",
+    "6 · Jour J",
+    "7 · Post-live"
+   ],
+   "member_ids": [
+    "u-marie",
+    "u-leslie",
+    "u-elisa",
+    "u-flora",
+    "u-jo",
+    "u-nico"
+   ],
+   "tasks": [
+    {
+     "title": "Valider le titre, la promesse et l’objectif du webinaire",
+     "phase": "1 · Cadrage",
+     "offset_days": -15,
+     "priority": "Haute",
+     "assignee_id": "u-nico",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Définir le CTA et le parcours après le webinaire",
+     "phase": "1 · Cadrage",
+     "offset_days": -15,
+     "priority": "Haute",
+     "assignee_id": "u-nico",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Créer le process de qualification commerciale",
+     "phase": "1 · Cadrage",
+     "offset_days": -14,
+     "priority": "Haute",
+     "assignee_id": "u-marie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Valider les contenus micronutrition et messages sensibles",
+     "phase": "1 · Cadrage",
+     "offset_days": -14,
+     "priority": "Haute",
+     "assignee_id": "u-flora",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Créer le runbook global du projet",
+     "phase": "1 · Cadrage",
+     "offset_days": -14,
+     "priority": "Haute",
+     "assignee_id": "u-elisa",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Finaliser la landing page d’inscription",
+     "phase": "2 · Acquisition",
+     "offset_days": -12,
+     "priority": "Haute",
+     "assignee_id": "u-jo",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Installer et vérifier les trackings Meta / Google",
+     "phase": "2 · Acquisition",
+     "offset_days": -12,
+     "priority": "Haute",
+     "assignee_id": "u-jo",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Créer les campagnes Meta Ads",
+     "phase": "2 · Acquisition",
+     "offset_days": -11,
+     "priority": "Haute",
+     "assignee_id": "u-nico",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Créer les visuels et contenus réseaux sociaux",
+     "phase": "2 · Acquisition",
+     "offset_days": -11,
+     "priority": "Moyenne",
+     "assignee_id": "u-leslie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Préparer l’email de confirmation Brevo",
+     "phase": "2 · Acquisition",
+     "offset_days": -11,
+     "priority": "Haute",
+     "assignee_id": "u-leslie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Automatiser inscription → Airtable → Brevo / WhatsApp",
+     "phase": "3 · Séquence pré-live",
+     "offset_days": -9,
+     "priority": "Haute",
+     "assignee_id": "u-jo",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Tourner la vidéo face cam J-5",
+     "phase": "3 · Séquence pré-live",
+     "offset_days": -6,
+     "priority": "Haute",
+     "assignee_id": "u-nico",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Préparer les messages J-5 / J-3 / J-1 / H-3 / H-15",
+     "phase": "3 · Séquence pré-live",
+     "offset_days": -6,
+     "priority": "Haute",
+     "assignee_id": "u-leslie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Vérifier le parcours d’inscription complet sur mobile",
+     "phase": "3 · Séquence pré-live",
+     "offset_days": -5,
+     "priority": "Haute",
+     "assignee_id": "u-jo",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Finaliser la trame 60 min + questions/réponses",
+     "phase": "4 · Contenu du live",
+     "offset_days": -7,
+     "priority": "Haute",
+     "assignee_id": "u-nico",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Préparer l’intervention micronutrition",
+     "phase": "4 · Contenu du live",
+     "offset_days": -7,
+     "priority": "Haute",
+     "assignee_id": "u-flora",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Finaliser les slides de présentation",
+     "phase": "4 · Contenu du live",
+     "offset_days": -5,
+     "priority": "Haute",
+     "assignee_id": "u-nico",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Sélectionner témoignages et cas clients",
+     "phase": "4 · Contenu du live",
+     "offset_days": -7,
+     "priority": "Moyenne",
+     "assignee_id": "u-leslie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Préparer les objections et réponses commerciales",
+     "phase": "4 · Contenu du live",
+     "offset_days": -5,
+     "priority": "Haute",
+     "assignee_id": "u-marie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Valider l’enchaînement opérationnel du live",
+     "phase": "4 · Contenu du live",
+     "offset_days": -5,
+     "priority": "Haute",
+     "assignee_id": "u-elisa",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Tester salle webinar, caméra, micro et partage écran",
+     "phase": "5 · Pré-live",
+     "offset_days": -3,
+     "priority": "Haute",
+     "assignee_id": "u-jo",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Organiser la répétition générale avec toute l’équipe",
+     "phase": "5 · Pré-live",
+     "offset_days": -2,
+     "priority": "Haute",
+     "assignee_id": "u-elisa",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Valider la modération chat et les réponses types",
+     "phase": "5 · Pré-live",
+     "offset_days": -2,
+     "priority": "Moyenne",
+     "assignee_id": "u-leslie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Préparer la liste des prospects inscrits et segments",
+     "phase": "5 · Pré-live",
+     "offset_days": -1,
+     "priority": "Haute",
+     "assignee_id": "u-marie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Animation principale du webinaire",
+     "phase": "6 · Jour J",
+     "offset_days": 0,
+     "priority": "Haute",
+     "assignee_id": "u-nico",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Intervention micronutrition",
+     "phase": "6 · Jour J",
+     "offset_days": 0,
+     "priority": "Haute",
+     "assignee_id": "u-flora",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Pilotage technique et surveillance du live",
+     "phase": "6 · Jour J",
+     "offset_days": 0,
+     "priority": "Haute",
+     "assignee_id": "u-jo",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Modération du chat et collecte des questions",
+     "phase": "6 · Jour J",
+     "offset_days": 0,
+     "priority": "Haute",
+     "assignee_id": "u-leslie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Repérer les prospects chauds et demandes de RDV",
+     "phase": "6 · Jour J",
+     "offset_days": 0,
+     "priority": "Haute",
+     "assignee_id": "u-marie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Coordonner le runbook et les timings",
+     "phase": "6 · Jour J",
+     "offset_days": 0,
+     "priority": "Haute",
+     "assignee_id": "u-elisa",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Envoyer replay et email de suivi",
+     "phase": "7 · Post-live",
+     "offset_days": 1,
+     "priority": "Haute",
+     "assignee_id": "u-leslie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Relancer les prospects chauds sous 24 h",
+     "phase": "7 · Post-live",
+     "offset_days": 1,
+     "priority": "Haute",
+     "assignee_id": "u-marie",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Lancer retargeting replay / no-show",
+     "phase": "7 · Post-live",
+     "offset_days": 1,
+     "priority": "Moyenne",
+     "assignee_id": "u-nico",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Vérifier les leads, sources et rendez-vous dans Airtable",
+     "phase": "7 · Post-live",
+     "offset_days": 1,
+     "priority": "Haute",
+     "assignee_id": "u-jo",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Faire le débrief opérationnel de l’équipe",
+     "phase": "7 · Post-live",
+     "offset_days": 3,
+     "priority": "Moyenne",
+     "assignee_id": "u-elisa",
+     "note": "",
+     "checklist": []
+    },
+    {
+     "title": "Analyser inscrits, présents, taux de présence, RDV et conversions",
+     "phase": "7 · Post-live",
+     "offset_days": 3,
+     "priority": "Haute",
+     "assignee_id": "u-nico",
+     "note": "",
+     "checklist": []
+    }
+   ],
+   "created_by": "u-nico",
+   "created_at": "2026-09-23T09:00:00.000Z"
+  }
+ ]
 }

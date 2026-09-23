@@ -41,12 +41,16 @@ export function visibleFor(me: Profile, s: Snapshot): Snapshot {
     reads: s.reads.filter((r) => r.user_id === me.id),
   };
   if (isAdmin(me)) return { ...s, ...privateParts };
+  const visibleTasks = s.tasks.filter((t) => canSeeTask(me, t, s.projects.filter((p) => p.member_ids.includes(me.id))));
+  const taskIds = new Set(visibleTasks.map((t) => t.id));
   const projects = s.projects.filter((p) => p.member_ids.includes(me.id));
   const ids = new Set(projects.map((p) => p.id));
   return {
     profiles: s.profiles,
     projects,
-    tasks: s.tasks.filter((t) => canSeeTask(me, t, projects)),
+    tasks: visibleTasks,
+    task_comments: s.task_comments.filter((c) => taskIds.has(c.task_id)),
+    templates: s.templates,
     comments: s.comments.filter((c) => ids.has(c.project_id)),
     events: s.events.filter((e) => canSeeEvent(me, e)),
     ...privateParts,

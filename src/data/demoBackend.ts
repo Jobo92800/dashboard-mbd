@@ -15,11 +15,20 @@ export const DEMO_PASSWORD = 'demo';
 function read(): Snapshot {
   try {
     const raw = localStorage.getItem(KEY);
-    // Les démos créées avant la messagerie n'ont pas ces tables : on les complète.
-    if (raw) return { conversations: [], messages: [], reads: [], ...JSON.parse(raw) } as Snapshot;
+    if (raw) return normalize(JSON.parse(raw));
   } catch { /* stockage indisponible : on repart du jeu d'exemple */ }
-  return structuredClone(seed) as Snapshot;
+  return normalize(structuredClone(seed) as unknown as Partial<Snapshot>);
 }
+
+/** Complète les démos enregistrées par une version précédente de l'appli. */
+function normalize(raw: Partial<Snapshot>): Snapshot {
+  const s = { conversations: [], messages: [], reads: [], task_comments: [], templates: [], ...raw } as Snapshot;
+  s.tasks = s.tasks.map((t) => ({ ...t, checklist: t.checklist ?? [], attachments: t.attachments ?? [], recurrence: t.recurrence ?? null }));
+  s.profiles = s.profiles.map((p) => ({ ...p, recap_email: p.recap_email ?? true }));
+  return s;
+}
+
+const MAX_DEMO_FILE = 700 * 1024;
 
 const listeners = new Set<() => void>();
 function write(s: Snapshot) {
@@ -77,6 +86,27 @@ export const demoBackend: Backend = {
     write(s);
   },
 
+  async insertMany(table, rows) {
+    const s = read();
+    (s[table] as unknown[]).unshift(...rows);
+    write(s);
+  },
+
+  async uploadFile(file) {
+    if (file.size > MAX_DEMO_FILE) throw new Error('En mode démo, les fichiers sont limités à 700 Ko. Une fois la base branchée : jusqu’à 20 Mo.');
+    const url = await new Promise<string>((ok, ko) => {
+      const r = new FileReader();
+      r.onload = () => ok(r.result as string);
+      r.onerror = () => ko(new Error('Lecture du fichier impossible.'));
+      r.readAsDataURL(file);
+    });
+    return { path: '', url };
+  },
+
+  async fileUrl(_path, fallback) {
+    return fallback;
+  },
+
   async upsert(table, row) {
     const s = read();
     const list = s[table] as { id: string }[];
@@ -92,11 +122,16 @@ export const demoBackend: Backend = {
       s.tasks = s.tasks.filter((t) => t.project_id !== id);
       s.comments = s.comments.filter((c) => c.project_id !== id);
     }
+    if (table === 'tasks') s.task_comments = s.task_comments.filter((c) => c.task_id !== id);
     if (table === 'conversations') {
       s.messages = s.messages.filter((m) => m.conversation_id !== id);
       s.reads = s.reads.filter((r) => r.conversation_id !== id);
     }
     write(s);
+  },
+
+  async accessToken() {
+    return '';
   },
 
   async inviteMember(m: NewMember) {
@@ -106,7 +141,7 @@ export const demoBackend: Backend = {
     }
     s.profiles.push({
       id: uid(), ...m, email: m.email.trim().toLowerCase(), active: true,
-      availability: 'disponible', availability_note: '',
+      availability: 'disponible', availability_note: '', recap_email: true,
     });
     write(s);
     return { tempPassword: DEMO_PASSWORD };

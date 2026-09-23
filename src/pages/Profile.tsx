@@ -6,6 +6,7 @@ import { AvailabilityPicker } from '../components/AvailabilityPicker';
 import { SignOutButton } from '../components/Layout';
 import { Avatar, Badge, Button, Card, Field, Input, PageTitle, Surtitre } from '../components/ui';
 import { EditMemberModal } from './Admin';
+import { DeviceCard, EmailCard } from '../components/DeviceSettings';
 
 export default function Profile() {
   const { me, mode } = useStore();
@@ -39,6 +40,8 @@ export default function Profile() {
           <Surtitre className="mb-3">Ma disponibilité</Surtitre>
           <AvailabilityPicker />
         </Card>
+        <DeviceCard />
+        <EmailCard />
         {mode === 'supabase' && (
           <Card className="grid gap-4 p-6">
             <Surtitre>Changer mon mot de passe</Surtitre>

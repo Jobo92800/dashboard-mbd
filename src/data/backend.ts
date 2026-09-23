@@ -20,8 +20,15 @@ export interface Backend {
   insert<T extends Table>(table: T, row: Snapshot[T][number]): Promise<void>;
   update<T extends Table>(table: T, id: string, patch: Partial<Snapshot[T][number]>): Promise<void>;
   remove(table: Table, id: string): Promise<void>;
+  insertMany<T extends Table>(table: T, rows: Snapshot[T][number][]): Promise<void>;
+  /** Dépose un fichier joint et renvoie son emplacement. */
+  uploadFile(file: File, folder: string): Promise<{ path: string; url: string }>;
+  /** Adresse temporaire pour ouvrir un fichier joint. */
+  fileUrl(path: string, fallback: string): Promise<string>;
   /** Crée ou remplace la ligne portant cet id. */
   upsert<T extends Table>(table: T, row: Snapshot[T][number]): Promise<void>;
+  /** Jeton de session, pour appeler les fonctions serveur. */
+  accessToken(): Promise<string>;
   inviteMember(m: NewMember): Promise<{ tempPassword?: string }>;
   /** Prévient quand les données changent ailleurs (autre onglet, collègue). */
   subscribe(cb: () => void): () => void;

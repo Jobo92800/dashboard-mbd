@@ -23,5 +23,19 @@ expliquer en français, sans jargon.
   réutilisée si elle existe ; y ajouter quelqu'un crée un nouveau groupe.
   Non-lus = messages des autres postérieurs à `reads.read_at`.
 
+- Lot « efficacité » (23 sept.) — migration 003 :
+  - tâches : `checklist` / `attachments` (jsonb), `recurrence` ; la suivante est
+    créée à la complétion (`spawnNext`, jamais dans le passé) ;
+  - `task_comments` ; fichiers dans le bucket privé `pieces-jointes/<task_id>/…`
+    (liens signés 10 min ; en démo : data URL ≤ 700 Ko) ;
+  - `templates` : échéances en jours relatifs à une « date clé » ; la duplication
+    de projet passe par un modèle éphémère calé sur la date de début ;
+  - PWA : `public/manifest.webmanifest`, `public/sw.js` (enregistré en prod
+    seulement), notifications système quand l'onglet est en arrière-plan. Le vrai
+    Web Push (appli fermée) reste à faire une fois Supabase branché (clés VAPID) ;
+  - e-mails : `src/lib/recap.ts` partagé entre l'aperçu (Profil) et les fonctions
+    Netlify planifiées `recap-lundi` (6 h UTC) et `bilan-vendredi` (15 h UTC),
+    envoi Brevo (`BREVO_API_KEY`), bouton de test `envoyer-recap`.
+
 ## Règles
 - Pas de push GitHub ni de déploiement Netlify sans demande explicite.

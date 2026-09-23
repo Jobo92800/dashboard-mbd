@@ -5,6 +5,9 @@ import App from './App';
 import { ToastProvider } from './state/toast';
 import { StoreProvider } from './state/store';
 import './index.css';
+import { registerServiceWorker } from './lib/device';
+
+registerServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -21,6 +21,11 @@ Reprend tout ce que faisait `MA_HQ_V22_STABLE.html` et ajoute :
 | **Charge de travail** par personne | Répartir avant de surcharger |
 | **Archivage** des projets, **historique** d’activité | Rien ne se perd |
 | **Messagerie interne** : à une personne, à plusieurs ou à toute l’équipe, groupes nommés, non-lus | Échanger sans WhatsApp perso ; conversations privées, même pour les admins |
+| **Fiche tâche complète** : sous-tâches, pièces jointes (fichiers, liens), commentaires avec @mentions | Tout le contexte au même endroit |
+| **Tâches récurrentes** (jour, jours ouvrés, semaine, 2 semaines, mois) | La suivante se crée toute seule quand on coche |
+| **Modèles de projets** et **duplication** avec dates recalées | Un webinaire = choisir la date du live, les 36 tâches se placent seules |
+| **Appli installable** (écran d’accueil), notifications de l’appareil, pastille de non-lus | Utilisable comme une vraie appli sur téléphone |
+| **Récap du lundi** (chacun) et **bilan du vendredi** (admins) par e-mail | Tout le monde démarre la semaine en sachant quoi faire |
 | **Export agenda (.ics)** | Ajouter ses réunions à Google Agenda / iPhone |
 | Mobile, charte MAbeautyplus | Utilisable en centre, sur téléphone |
 
@@ -61,7 +66,10 @@ Puis ouvrir http://localhost:5190.
    | `VITE_SUPABASE_URL` | Project URL |
    | `VITE_SUPABASE_ANON_KEY` | clé `anon` / publishable |
    | `SUPABASE_SERVICE_ROLE_KEY` | clé `service_role` / secret — **jamais dans le code** |
-7. Redéployer. La page de connexion n’affiche plus les comptes démo : on est en
+   | `BREVO_API_KEY` | Brevo → SMTP & API → Clés API (même compte que l’app nutrition) |
+7. Les e-mails partent tout seuls (lundi ~8 h, vendredi ~17 h, heure d’été).
+   Pour tester : *Mon profil → M’envoyer mon récap maintenant*.
+8. Redéployer. La page de connexion n’affiche plus les comptes démo : on est en
    mode réel.
 
 ## Qui peut faire quoi

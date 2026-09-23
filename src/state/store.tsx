@@ -2,12 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { backend } from '../data';
 import { uid } from '../data/backend';
 import type { NewMember } from '../data/backend';
-import type { CalEvent, Conversation, Message, Profile, Project, Snapshot, Task, TaskStatus } from '../lib/types';
+import type { Attachment, CalEvent, ChecklistItem, Conversation, Message, Profile, Project, ProjectTemplate, Snapshot, Task, TaskStatus } from '../lib/types';
+import { nextOccurrence, shiftIso } from '../lib/recurrence';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useToast } from './toast';
+import { nextColor as nextColorFor } from '../lib/palette';
 
 const EMPTY: Snapshot = {
   profiles: [], projects: [], tasks: [], comments: [], events: [], notifications: [], activity: [],
-  conversations: [], messages: [], reads: [],
+  conversations: [], messages: [], reads: [], task_comments: [], templates: [],
 };
 const now = () => new Date().toISOString();
 
@@ -80,6 +83,64 @@ function useStoreValue() {
         .map((user_id) => backend.insert('notifications', { id: uid(), user_id, text, link, read: false, created_at: now() })),
     );
 
+  /** Tâche récurrente terminée : on prépare la suivante (sauf si elle existe déjà). */
+  const spawnNext = async (t: Task) => {
+    if (!t.recurrence) return;
+    const due = nextOccurrence(t.due_date, t.recurrence);
+    const exists = snap.tasks.some((x) => x.id !== t.id && x.title === t.title && x.recurrence === t.recurrence && x.due_date === due && x.status !== 'fait');
+    if (exists) return;
+    const next: Task = {
+      ...t, id: uid(), due_date: due, status: 'a_faire', done_at: null, created_at: now(), created_by: me!.id,
+      checklist: t.checklist.map((c) => ({ ...c, done: false })),
+    };
+    await backend.insert('tasks', next);
+  };
+
+  const mentionedIn = (body: string) =>
+    snap.profiles.filter((p) => new RegExp(`@${escapeRe(p.full_name.split(' ')[0])}\\b`, 'i').test(body)).map((p) => p.id);
+
+  /** Crée un projet et ses tâches à partir d'un modèle, calé sur une date de référence. */
+  const instantiate = async (tpl: ProjectTemplate, name: string, refDate: string, memberIds: string[], keepAssignees: boolean) => {
+    const project: Project = {
+      id: uid(), name, description: tpl.description, color: nextColorFor(snap.projects.map((p) => p.color)),
+      start_date: shiftIso(refDate, tpl.start_offset), end_date: shiftIso(refDate, tpl.end_offset),
+      status: 'en_cours', phases: [...tpl.phases], member_ids: memberIds, created_by: me!.id, created_at: now(),
+    };
+    const tasks: Task[] = tpl.tasks.map((tt) => ({
+      id: uid(), project_id: project.id, phase: tt.phase, title: tt.title, note: tt.note,
+      assignee_id: keepAssignees && tt.assignee_id && memberIds.includes(tt.assignee_id) ? tt.assignee_id : null,
+      due_date: tt.offset_days === null ? null : shiftIso(refDate, tt.offset_days),
+      priority: tt.priority, status: 'a_faire', kind: null, centre: null, created_by: me!.id, created_at: now(), done_at: null,
+      checklist: tt.checklist.map((text) => ({ id: uid(), text, done: false })), attachments: [], recurrence: null,
+    }));
+    await run(
+      (st) => ({ ...st, projects: [project, ...st.projects], tasks: [...tasks, ...st.tasks] }),
+      async () => {
+        await backend.insert('projects', project);
+        await backend.insertMany('tasks', tasks);
+        await log(`a créé le projet « ${name} » (${tasks.length} tâches)`, project.id);
+        await notify(memberIds, `${firstName(me!.id)} t’a ajouté(e) au projet « ${name} »`, `/projets/${project.id}`);
+      },
+      `Projet créé avec ${tasks.length} tâches`,
+    );
+    return project.id;
+  };
+
+  /** Transforme un projet existant en modèle (échéances en jours par rapport à la référence). */
+  const templateFrom = (p: Project, refDate: string, name: string, label: string, keepAssignees: boolean): ProjectTemplate => {
+    const off = (iso: string | null) => (iso ? differenceInCalendarDays(parseISO(iso), parseISO(refDate)) : null);
+    return {
+      id: uid(), name, description: p.description, reference_label: label,
+      start_offset: off(p.start_date) ?? 0, end_offset: off(p.end_date) ?? 0,
+      phases: [...p.phases], member_ids: [...p.member_ids],
+      tasks: snap.tasks.filter((t) => t.project_id === p.id).map((t) => ({
+        title: t.title, phase: t.phase, offset_days: off(t.due_date), priority: t.priority,
+        assignee_id: keepAssignees ? t.assignee_id : null, note: t.note, checklist: t.checklist.map((c) => c.text),
+      })),
+      created_by: me!.id, created_at: now(),
+    };
+  };
+
   const actions = {
     async signIn(email: string, password: string) {
       await backend.signIn(email, password);
@@ -139,6 +200,7 @@ function useStoreValue() {
           (s) => ({ ...s, tasks: s.tasks.map((x) => (x.id === t.id ? { ...x, ...patch } : x)) }),
           async () => {
             await backend.update('tasks', existing.id, patch);
+            if (patch.status === 'fait' && existing.status !== 'fait') await spawnNext({ ...existing, ...patch } as Task);
             if (reassigned) await notify([t.assignee_id!], `${firstName(me!.id)} t’a confié : « ${t.title} »${where}`, project ? `/projets/${project.id}` : '/ma-journee');
           },
           'Tâche mise à jour',
@@ -147,7 +209,7 @@ function useStoreValue() {
       const row: Task = {
         id: uid(), project_id: null, phase: null, note: '', assignee_id: me!.id, due_date: null,
         priority: 'Moyenne', status: 'a_faire', kind: null, centre: null,
-        created_by: me!.id, created_at: now(), done_at: null, ...t,
+        created_by: me!.id, created_at: now(), done_at: null, checklist: [], attachments: [], recurrence: null, ...t,
       } as Task;
       return run(
         (s) => ({ ...s, tasks: [row, ...s.tasks] }),
@@ -166,6 +228,7 @@ function useStoreValue() {
         (s) => ({ ...s, tasks: s.tasks.map((x) => (x.id === t.id ? { ...x, ...patch } : x)) }),
         async () => {
           await backend.update('tasks', t.id, patch);
+          if (status === 'fait') await spawnNext(t);
           if (status === 'fait' && t.project_id) {
             await log(`a terminé « ${t.title} »`, t.project_id);
             if (t.created_by && t.created_by !== t.assignee_id)
@@ -173,6 +236,77 @@ function useStoreValue() {
           }
         },
       );
+    },
+
+    /** Modification légère (sous-tâches, pièces jointes) sans message de confirmation. */
+    patchTask(t: Task, patch: Partial<Task>) {
+      return run(
+        (s) => ({ ...s, tasks: s.tasks.map((x) => (x.id === t.id ? { ...x, ...patch } : x)) }),
+        () => backend.update('tasks', t.id, patch),
+      );
+    },
+
+    setChecklist(t: Task, checklist: ChecklistItem[]) {
+      return actions.patchTask(t, { checklist });
+    },
+
+    async addAttachment(t: Task, input: { file?: File; name?: string; url?: string }) {
+      let att: Attachment;
+      if (input.file) {
+        const { path, url } = await backend.uploadFile(input.file, t.id);
+        att = { id: uid(), name: input.file.name, url, path: path || undefined, kind: 'fichier', size: input.file.size };
+      } else {
+        let url = (input.url ?? '').trim();
+        if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+        att = { id: uid(), name: (input.name ?? '').trim() || url.replace(/^https?:\/\//, '').slice(0, 60), url, kind: 'lien' };
+      }
+      const current = snap.tasks.find((x) => x.id === t.id) ?? t;
+      await actions.patchTask(current, { attachments: [...current.attachments, att] });
+    },
+
+    removeAttachment(t: Task, id: string) {
+      return actions.patchTask(t, { attachments: t.attachments.filter((a) => a.id !== id) });
+    },
+
+    openAttachment: (a: Attachment) => (a.path ? backend.fileUrl(a.path, a.url) : Promise.resolve(a.url)),
+
+    addTaskComment(t: Task, body: string) {
+      const row = { id: uid(), task_id: t.id, author_id: me!.id, body, created_at: now() };
+      const link = t.project_id ? `/projets/${t.project_id}?tache=${t.id}` : `/taches?tache=${t.id}`;
+      const mentioned = mentionedIn(body);
+      return run(
+        (s) => ({ ...s, task_comments: [...s.task_comments, row] }),
+        async () => {
+          await backend.insert('task_comments', row);
+          await notify(mentioned, `${firstName(me!.id)} t’a mentionné(e) sur « ${t.title} »`, link);
+          const others = [t.assignee_id ?? '', t.created_by ?? ''].filter((id) => id && !mentioned.includes(id));
+          await notify(others, `${firstName(me!.id)} a commenté « ${t.title} »`, link);
+        },
+      );
+    },
+
+    deleteTaskComment(id: string) {
+      return run((s) => ({ ...s, task_comments: s.task_comments.filter((c) => c.id !== id) }), () => backend.remove('task_comments', id));
+    },
+
+    saveTemplateFromProject(p: Project, opts: { name: string; refDate: string; label: string; keepAssignees: boolean }) {
+      const tpl = templateFrom(p, opts.refDate, opts.name, opts.label, opts.keepAssignees);
+      return run((s) => ({ ...s, templates: [tpl, ...s.templates] }), () => backend.insert('templates', tpl), 'Modèle enregistré');
+    },
+
+    deleteTemplate(id: string) {
+      return run((s) => ({ ...s, templates: s.templates.filter((t) => t.id !== id) }), () => backend.remove('templates', id), 'Modèle supprimé');
+    },
+
+    createFromTemplate(tpl: ProjectTemplate, opts: { name: string; refDate: string; memberIds: string[]; keepAssignees: boolean }) {
+      return instantiate(tpl, opts.name, opts.refDate, opts.memberIds, opts.keepAssignees);
+    },
+
+    /** Copie d'un projet décalée à une nouvelle date de début. */
+    duplicateProject(p: Project, opts: { name: string; startDate: string; keepAssignees: boolean }) {
+      const ref = p.start_date || now().slice(0, 10);
+      const tpl = templateFrom(p, ref, opts.name, 'Début', true);
+      return instantiate(tpl, opts.name, opts.startDate, [...p.member_ids], opts.keepAssignees);
     },
 
     deleteTask(t: Task) {
@@ -185,9 +319,7 @@ function useStoreValue() {
 
     addComment(project: Project, body: string) {
       const row = { id: uid(), project_id: project.id, author_id: me!.id, body, created_at: now() };
-      const mentioned = snap.profiles
-        .filter((p) => new RegExp(`@${escapeRe(p.full_name.split(' ')[0])}\\b`, 'i').test(body))
-        .map((p) => p.id);
+      const mentioned = mentionedIn(body);
       return run(
         (s) => ({ ...s, comments: [...s.comments, row] }),
         async () => {

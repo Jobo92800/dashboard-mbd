@@ -19,6 +19,7 @@ export interface Profile {
   active: boolean;
   availability: Availability;
   availability_note: string;
+  recap_email: boolean; // reçoit le récap du lundi (et le bilan du vendredi pour les admins)
 }
 
 export interface Project {
@@ -34,6 +35,20 @@ export interface Project {
   created_by: string | null;
   created_at: string;
 }
+
+export type Recurrence = 'quotidienne' | 'jours_ouvres' | 'hebdomadaire' | 'bimensuelle' | 'mensuelle';
+export const RECURRENCES: { id: Recurrence; label: string }[] = [
+  { id: 'quotidienne', label: 'Tous les jours' },
+  { id: 'jours_ouvres', label: 'Du lundi au vendredi' },
+  { id: 'hebdomadaire', label: 'Toutes les semaines' },
+  { id: 'bimensuelle', label: 'Toutes les 2 semaines' },
+  { id: 'mensuelle', label: 'Tous les mois' },
+];
+
+export interface ChecklistItem { id: string; text: string; done: boolean }
+
+/** Lien (Canva, Drive…) ou fichier déposé. `path` = emplacement dans le stockage pour un fichier. */
+export interface Attachment { id: string; name: string; url: string; kind: 'lien' | 'fichier'; path?: string; size?: number }
 
 /** Une tâche sans project_id est une « tâche rapide » (hors projet). */
 export interface Task {
@@ -51,6 +66,42 @@ export interface Task {
   created_by: string | null;
   created_at: string;
   done_at: string | null;
+  checklist: ChecklistItem[];
+  attachments: Attachment[];
+  recurrence: Recurrence | null;
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+}
+
+/** Tâche de modèle : l'échéance est un décalage en jours par rapport à la date de référence. */
+export interface TemplateTask {
+  title: string;
+  phase: string | null;
+  offset_days: number | null;
+  priority: Priority;
+  assignee_id: string | null;
+  note: string;
+  checklist: string[];
+}
+
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  description: string;
+  reference_label: string; // ex. « Jour du live »
+  start_offset: number; // début du projet par rapport à la référence
+  end_offset: number;
+  phases: string[];
+  member_ids: string[];
+  tasks: TemplateTask[];
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface Comment {
@@ -127,6 +178,8 @@ export interface Snapshot {
   conversations: Conversation[];
   messages: Message[];
   reads: ReadMark[];
+  task_comments: TaskComment[];
+  templates: ProjectTemplate[];
 }
 
 export type Table = keyof Snapshot;

@@ -1,4 +1,4 @@
-import { Check, MessageSquareText, Pencil } from 'lucide-react';
+import { Check, ListChecks, MessageSquare, Paperclip, Pencil, Repeat } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Task } from '../lib/types';
 import { useStore } from '../state/store';
@@ -27,6 +27,25 @@ export function StatusCheck({ task, disabled }: { task: Task; disabled?: boolean
   );
 }
 
+/** Petits repères : sous-tâches, pièces jointes, commentaires, répétition. */
+export function TaskMeta({ task }: { task: Task }) {
+  const { snap } = useStore();
+  const comments = snap.task_comments.filter((c) => c.task_id === task.id).length;
+  const done = task.checklist.filter((c) => c.done).length;
+  return (
+    <>
+      {task.checklist.length > 0 && (
+        <span className={`inline-flex items-center gap-1 ${done === task.checklist.length ? 'text-mab-succes' : ''}`} title="Sous-tâches">
+          <ListChecks size={13} /> {done}/{task.checklist.length}
+        </span>
+      )}
+      {task.attachments.length > 0 && <span className="inline-flex items-center gap-1" title="Pièces jointes"><Paperclip size={13} /> {task.attachments.length}</span>}
+      {comments > 0 && <span className="inline-flex items-center gap-1" title="Commentaires"><MessageSquare size={13} /> {comments}</span>}
+      {task.recurrence && <span className="inline-flex items-center text-mab-violet-texte" title="Tâche récurrente"><Repeat size={13} /></span>}
+    </>
+  );
+}
+
 export function TaskRow({ task, onEdit, showProject = false, compact = false }: {
   task: Task; onEdit?: (t: Task) => void; showProject?: boolean; compact?: boolean;
 }) {
@@ -39,7 +58,11 @@ export function TaskRow({ task, onEdit, showProject = false, compact = false }: 
     <div className={`group flex items-center gap-3 border-b border-mab-filet px-1 py-3 last:border-0 ${compact ? 'py-2.5' : ''}`}>
       <StatusCheck task={task} disabled={!editable} />
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-[15px] ${done ? 'text-mab-gris-doux line-through' : 'text-mab-encre'}`}>{task.title}</p>
+        {onEdit && editable ? (
+          <button type="button" onClick={() => onEdit(task)} className={`block max-w-full truncate text-left text-[15px] hover:underline ${done ? 'text-mab-gris-doux line-through' : 'text-mab-encre'}`}>{task.title}</button>
+        ) : (
+          <p className={`truncate text-[15px] ${done ? 'text-mab-gris-doux line-through' : 'text-mab-encre'}`}>{task.title}</p>
+        )}
         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-mab-texte">
           <span className={late ? 'font-semibold text-mab-erreur' : ''}>{relativeLabel(task.due_date)}</span>
           {task.status === 'en_cours' && <span className="font-medium text-mab-violet-texte">En cours</span>}
@@ -51,7 +74,7 @@ export function TaskRow({ task, onEdit, showProject = false, compact = false }: 
           )}
           {showProject && !project && task.kind && <span>{task.kind}</span>}
           {task.centre && <span>· {task.centre}</span>}
-          {task.note && <MessageSquareText size={13} className="text-mab-gris-doux" aria-label="A une note" />}
+          <TaskMeta task={task} />
         </div>
       </div>
       {!compact && task.priority !== 'Moyenne' && !done && <Badge tone={PRIO_TONE[task.priority]}>{task.priority}</Badge>}
