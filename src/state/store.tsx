@@ -219,6 +219,52 @@ function useStoreValue() {
       ).then(() => row.id);
     },
 
+    // ---------- Étapes de la roadmap ----------
+    /** Change la liste d'étapes du projet et, si besoin, l'étape de certaines tâches. */
+    async setPhases(p: Project, phases: string[], retag: { from: string; to: string | null }[] = [], okText?: string) {
+      const moved = snapRef.current.tasks.filter((t) => t.project_id === p.id && retag.some((r) => r.from === t.phase));
+      const newPhase = (t: Task) => retag.find((r) => r.from === t.phase)!.to;
+      await run(
+        (st) => ({
+          ...st,
+          projects: st.projects.map((x) => (x.id === p.id ? { ...x, phases } : x)),
+          tasks: st.tasks.map((t) => (moved.some((m) => m.id === t.id) ? { ...t, phase: newPhase(t) } : t)),
+        }),
+        async () => {
+          await backend.update('projects', p.id, { phases });
+          for (const t of moved) await backend.update('tasks', t.id, { phase: newPhase(t) });
+        },
+        okText,
+      );
+    },
+
+    addPhase(p: Project, name: string) {
+      const n = name.trim();
+      if (!n || p.phases.includes(n)) { toast(n ? 'Cette étape existe déjà.' : 'Donne un nom à l’étape.', 'erreur'); return Promise.resolve(); }
+      return actions.setPhases(p, [...p.phases, n], [], 'Étape ajoutée');
+    },
+
+    renamePhase(p: Project, from: string, to: string) {
+      const n = to.trim();
+      if (!n || n === from) return Promise.resolve();
+      if (p.phases.includes(n)) { toast('Une étape porte déjà ce nom.', 'erreur'); return Promise.resolve(); }
+      return actions.setPhases(p, p.phases.map((x) => (x === from ? n : x)), [{ from, to: n }], 'Étape renommée');
+    },
+
+    movePhase(p: Project, name: string, dir: -1 | 1) {
+      const i = p.phases.indexOf(name);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= p.phases.length) return Promise.resolve();
+      const next = [...p.phases];
+      [next[i], next[j]] = [next[j], next[i]];
+      return actions.setPhases(p, next);
+    },
+
+    /** Supprime l'étape ; ses tâches passent dans une autre étape (ou « Sans étape »). */
+    deletePhase(p: Project, name: string, moveTo: string | null) {
+      return actions.setPhases(p, p.phases.filter((x) => x !== name), [{ from: name, to: moveTo }], 'Étape supprimée');
+    },
+
     deleteProject(p: Project) {
       return run(
         (s) => ({ ...s, projects: s.projects.filter((x) => x.id !== p.id), tasks: s.tasks.filter((t) => t.project_id !== p.id) }),

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Archive, ArrowLeft, CheckCheck, Copy, LayoutTemplate, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Archive, ArrowDown, ArrowLeft, ArrowUp, CheckCheck, Copy, LayoutTemplate, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../state/store';
-import type { Task, TaskStatus } from '../lib/types';
+import type { Project, Task, TaskStatus } from '../lib/types';
 import { daysUntil, fmtShort, fmtStamp } from '../lib/dates';
 import { isDone, isLate, progress, projectHealth, sortTasks } from '../lib/selectors';
 import { isAdmin, isProjectMember } from '../lib/permissions';
@@ -11,7 +11,7 @@ import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { ProjectModal } from '../components/ProjectModal';
 import { DuplicateModal, SaveTemplateModal } from '../components/TemplateModals';
 import { Comments } from '../components/Comments';
-import { ActionMenu, Avatar, AvatarStack, Badge, Button, Card, Empty, Progress, Surtitre, Tabs } from '../components/ui';
+import { ActionMenu, Avatar, AvatarStack, Badge, Button, Card, Empty, Modal, Progress, Select, Surtitre, Tabs } from '../components/ui';
 
 type View = 'roadmap' | 'tableau' | 'liste';
 
@@ -25,6 +25,7 @@ export default function ProjectDetail() {
   const [editing, setEditing] = useState(false);
   const [dup, setDup] = useState(false);
   const [asTpl, setAsTpl] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [person, setPerson] = useState('');
   const [hideDone, setHideDone] = useState(false);
 
@@ -112,12 +113,8 @@ export default function ProjectDetail() {
                   const all = tasks.filter((t) => phaseOf(t) === ph);
                   if (ph === 'Sans étape' && !all.length) return null;
                   return (
-                    <Card key={ph} className="p-5">
-                      <div className="mb-2 flex items-center gap-3">
-                        <span className="grid h-7 w-7 place-items-center rounded-full text-xs font-bold text-white" style={{ background: i % 2 ? '#e8318a' : '#3bbfbf' }}>{i + 1}</span>
-                        <h3 className="flex-1 font-semibold">{ph.replace(/^\d+\s*·\s*/, '')}</h3>
-                        <span className="text-xs text-mab-texte">{all.filter(isDone).length} / {all.length}</span>
-                      </div>
+                    <Card key={ph} id={`etape-${i}`} className="scroll-mt-24 p-5">
+                      <PhaseHeader project={project} phase={ph} index={i} done={all.filter(isDone).length} total={all.length} editable={admin && ph !== 'Sans étape'} onDelete={() => setDeleting(ph)} />
                       {list.map((t) => <TaskRow key={t.id} task={t} onEdit={setDraft} />)}
                       {list.length === 0 && <p className="py-2 text-sm text-mab-gris-doux">Aucune tâche{person || hideDone ? ' avec ces filtres' : ''}.</p>}
                       {member && ph !== 'Sans étape' && (
@@ -126,6 +123,7 @@ export default function ProjectDetail() {
                     </Card>
                   );
                 })}
+                {admin && <AddPhase project={project} />}
               </div>
             </>
           )}
@@ -161,6 +159,7 @@ export default function ProjectDetail() {
 
       <TaskModal draft={draft} onClose={() => setDraft(null)} />
       <ProjectModal open={editing} project={project} onClose={() => setEditing(false)} />
+      <DeletePhaseModal project={project} phase={deleting} count={tasks.filter((t) => t.phase === deleting).length} onClose={() => setDeleting(null)} />
       <DuplicateModal open={dup} project={project} onClose={() => setDup(false)} />
       <SaveTemplateModal open={asTpl} project={project} onClose={() => setAsTpl(false)} />
     </>
@@ -177,10 +176,13 @@ function PhaseStepper({ phases, tasks, phaseOf }: { phases: string[]; tasks: Tas
         const late = all.some(isLate);
         const complete = all.length > 0 && done === all.length;
         return (
-          <div key={ph} className={`min-w-[140px] flex-1 rounded-mab-champ border px-3 py-2.5 ${complete ? 'border-mab-filet-aqua bg-mab-wash-2' : late ? 'border-mab-filet-rose bg-mab-rose-wash' : 'border-mab-filet bg-white'}`}>
+          <button
+            key={ph}
+            onClick={() => document.getElementById(`etape-${phases.indexOf(ph)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className={`min-w-[140px] flex-1 rounded-mab-champ border px-3 py-2.5 text-left transition hover:border-mab-filet-aqua ${complete ? 'border-mab-filet-aqua bg-mab-wash-2' : late ? 'border-mab-filet-rose bg-mab-rose-wash' : 'border-mab-filet bg-white'}`}>
             <p className="truncate text-xs font-semibold text-mab-encre" title={ph}>{ph.replace(/^\d+\s*·\s*/, '')}</p>
             <p className={`mt-0.5 text-xs ${late && !complete ? 'text-mab-erreur' : 'text-mab-texte'}`}>{complete ? 'Terminé' : `${done} / ${all.length}${late ? ' · retard' : ''}`}</p>
-          </div>
+          </button>
         );
       })}
     </div>
@@ -249,5 +251,106 @@ function Kanban({ tasks, onEdit, canEdit }: { tasks: Task[]; onEdit: (t: Task) =
         );
       })}
     </div>
+  );
+}
+
+/** En-tête d'une étape : renommer au clic (admin), réordonner, supprimer. */
+function PhaseHeader({ project, phase, index, done, total, editable, onDelete }: {
+  project: Project; phase: string; index: number; done: number; total: number; editable: boolean; onDelete: () => void;
+}) {
+  const { renamePhase, movePhase } = useStore();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(phase);
+  useEffect(() => setName(phase), [phase]);
+  const pos = project.phases.indexOf(phase);
+  const save = () => { setEditing(false); if (name.trim() && name.trim() !== phase) renamePhase(project, phase, name); else setName(phase); };
+  return (
+    <div className="mb-2 flex items-center gap-3">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{ background: index % 2 ? '#e8318a' : '#3bbfbf' }}>{index + 1}</span>
+      {editing ? (
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setName(phase); setEditing(false); } }}
+          className="h-9 min-w-0 flex-1 rounded-mab-champ border border-mab-aqua px-3 font-semibold focus:outline-none focus:ring-2 focus:ring-mab-aqua/30"
+          aria-label="Nom de l’étape"
+        />
+      ) : (
+        <h3
+          className={`min-w-0 flex-1 truncate font-semibold ${editable ? 'cursor-text rounded-mab-etiquette hover:bg-mab-wash' : ''}`}
+          onClick={() => editable && setEditing(true)}
+          title={editable ? 'Cliquer pour renommer' : undefined}
+        >
+          {phase.replace(/^\d+\s*·\s*/, '')}
+        </h3>
+      )}
+      <span className="shrink-0 text-xs text-mab-texte">{done} / {total}</span>
+      {editable && (
+        <ActionMenu label="Options de l’étape" actions={[
+          { label: 'Renommer', icon: Pencil, onClick: () => setEditing(true) },
+          { label: 'Monter', icon: ArrowUp, onClick: () => movePhase(project, phase, -1), hidden: pos <= 0 },
+          { label: 'Descendre', icon: ArrowDown, onClick: () => movePhase(project, phase, 1), hidden: pos >= project.phases.length - 1 },
+          { label: 'Supprimer l’étape', icon: Trash2, danger: true, onClick: onDelete },
+        ]} />
+      )}
+    </div>
+  );
+}
+
+function AddPhase({ project }: { project: Project }) {
+  const { addPhase } = useStore();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const submit = async () => { if (!name.trim()) return; await addPhase(project, name); setName(''); setOpen(false); };
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="flex items-center justify-center gap-2 rounded-mab-carte border border-dashed border-mab-filet-aqua bg-mab-wash px-5 py-4 text-sm font-medium text-mab-aqua-texte hover:bg-mab-wash-2">
+        <Plus size={16} /> Ajouter une étape
+      </button>
+    );
+  }
+  return (
+    <Card className="flex flex-wrap items-center gap-2 p-4">
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setOpen(false); }}
+        placeholder="Nom de la nouvelle étape (ex. Bilan)"
+        className="h-11 min-w-0 flex-1 rounded-mab-champ border border-mab-filet px-4 focus:border-mab-aqua focus:outline-none focus:ring-2 focus:ring-mab-aqua/30"
+      />
+      <Button variant="secondaire" disabled={!name.trim()} onClick={submit}>Ajouter</Button>
+      <Button variant="tertiaire" onClick={() => setOpen(false)}>Annuler</Button>
+    </Card>
+  );
+}
+
+function DeletePhaseModal({ project, phase, count, onClose }: { project: Project; phase: string | null; count: number; onClose: () => void }) {
+  const { deletePhase } = useStore();
+  const [target, setTarget] = useState('');
+  const others = project.phases.filter((p) => p !== phase);
+  useEffect(() => { if (phase) setTarget(others[0] ?? ''); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!phase) return null;
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Supprimer l’étape « ${phase.replace(/^\d+\s*·\s*/, '')} »`}
+      footer={<><Button variant="tertiaire" onClick={onClose}>Annuler</Button><Button variant="danger" onClick={() => { deletePhase(project, phase, count ? target || null : null); onClose(); }}><Trash2 size={15} /> Supprimer l’étape</Button></>}
+    >
+      {count === 0 ? (
+        <p className="text-sm text-mab-texte">Cette étape ne contient aucune tâche.</p>
+      ) : (
+        <div className="grid gap-3">
+          <p className="text-sm text-mab-texte">Elle contient <b>{count} tâche{count > 1 ? 's' : ''}</b>. {count > 1 ? 'Elles ne sont pas supprimées : choisis où les ranger.' : 'Elle n’est pas supprimée : choisis où la ranger.'}</p>
+          <Select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Étape de destination">
+            {others.map((p) => <option key={p} value={p}>{p.replace(/^\d+\s*·\s*/, '')}</option>)}
+            <option value="">Sans étape</option>
+          </Select>
+        </div>
+      )}
+    </Modal>
   );
 }
