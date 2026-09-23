@@ -289,7 +289,7 @@ function useStoreValue() {
       );
     },
 
-    saveTask(t: Partial<Task> & { title: string }) {
+    saveTask(t: Partial<Task> & { title: string }, quiet = false) {
       const existing = t.id ? snap.tasks.find((x) => x.id === t.id) : undefined;
       const project = snap.projects.find((p) => p.id === (t.project_id ?? existing?.project_id));
       const where = project ? ` (${project.name})` : '';
@@ -316,9 +316,9 @@ function useStoreValue() {
         async () => {
           await backend.insert('tasks', row);
           if (project) await log(`a ajouté la tâche « ${row.title} »`, project.id);
-          await notify([row.assignee_id ?? ''], `${firstName(me!.id)} t’a confié : « ${row.title} »${where}`, project ? `/projets/${project.id}` : '/ma-journee');
+          await notify([row.assignee_id ?? ''], `${firstName(me!.id)} t’a confié : « ${row.title} »${where}`, project ? `/projets/${project.id}?tache=${row.id}` : `/taches?tache=${row.id}`);
         },
-        'Tâche ajoutée',
+        quiet ? undefined : 'Tâche ajoutée',
       );
     },
 

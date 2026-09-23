@@ -1,5 +1,7 @@
 import { useSearchParams, Link } from 'react-router-dom';
-import { Mail, MessageSquare } from 'lucide-react';
+import { ListPlus, Mail, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { useStore } from '../state/store';
 import type { Profile } from '../lib/types';
 import { isDone, isLate, sortTasks } from '../lib/selectors';
@@ -11,6 +13,7 @@ import { todayIso } from '../lib/dates';
 
 export default function Team() {
   const { snap, online } = useStore();
+  const [draft, setDraft] = useState<TaskDraft | null>(null);
   const [params, setParams] = useSearchParams();
   const selected = params.get('personne');
   const people = snap.profiles.filter((p) => p.active).sort((a, b) => Number(online.has(b.id)) - Number(online.has(a.id)));
@@ -22,7 +25,7 @@ export default function Team() {
       <PageTitle title={<>L’<b>équipe</b></>} sub="Disponibilités, charge de travail et projets de chacun." />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {people.map((p) => (
-          <PersonCard key={p.id} p={p} max={maxLoad} active={p.id === selected} onClick={() => setParams(p.id === selected ? {} : { personne: p.id })} />
+          <PersonCard key={p.id} p={p} max={maxLoad} active={p.id === selected} onClick={() => setParams(p.id === selected ? {} : { personne: p.id })} onAssign={() => setDraft({ assignee_id: p.id })} />
         ))}
       </div>
 
@@ -40,11 +43,12 @@ export default function Team() {
           {!snap.tasks.some((t) => t.assignee_id === person.id && !isDone(t)) && <p className="py-3 text-sm text-mab-texte">Aucune tâche ouverte visible.</p>}
         </Card>
       )}
+      <TaskModal draft={draft} onClose={() => setDraft(null)} />
     </>
   );
 }
 
-function PersonCard({ p, max, active, onClick }: { p: Profile; max: number; active: boolean; onClick: () => void }) {
+function PersonCard({ p, max, active, onClick, onAssign }: { p: Profile; max: number; active: boolean; onClick: () => void; onAssign: () => void }) {
   const { snap, me } = useStore();
   const presenceText = usePresenceText();
   const open = snap.tasks.filter((t) => t.assignee_id === p.id && !isDone(t));
@@ -93,6 +97,7 @@ function PersonCard({ p, max, active, onClick }: { p: Profile; max: number; acti
         {p.id !== me!.id && (
           <Link to={`/messages?a=${p.id}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-mab-aqua-texte hover:underline"><MessageSquare size={15} /> Écrire</Link>
         )}
+        <button onClick={onAssign} className="inline-flex items-center gap-1.5 text-sm font-medium text-mab-aqua-texte hover:underline"><ListPlus size={15} /> {p.id === me!.id ? 'Me créer une tâche' : 'Confier une tâche'}</button>
         <a href={`mailto:${p.email}`} className="inline-flex items-center gap-1.5 text-xs text-mab-texte hover:underline"><Mail size={13} /> {p.email}</a>
       </div>
     </Card>
