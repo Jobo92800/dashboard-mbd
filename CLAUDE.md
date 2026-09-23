@@ -67,6 +67,11 @@ expliquer en français, sans jargon.
   démarrage, toutes les 2 min si visible, en quittant) pour « vu il y a… », hors
   publication temps réel pour ne pas recharger tout le monde. Démo : les onglets
   se signalent via BroadcastChannel. `PresenceDot` / `usePresenceText`.
+- Mises à jour : `vite.config.ts` publie `/version.json` (commit + heure de
+  construction + dernier message de commit) et fixe `__APP_VERSION__` ;
+  `UpdateNotice` compare toutes les 2 min et au retour sur l'appli, puis propose
+  « Actualiser ». Le message de commit sert de note de nouveauté : l'écrire en
+  français lisible par l'équipe.
 - Mise en production : tester en démo → valider 004 en transaction annulée →
   demander à Jonathan → `db:push` → aperçu Netlify → production.
 
