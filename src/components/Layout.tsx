@@ -3,8 +3,9 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, BookOpen, CalendarDays, FolderKanban, Link2, ListChecks, LogOut, Megaphone, Menu, MessagesSquare, Palmtree, Search, ShieldCheck, Sun, Users } from 'lucide-react';
 import { useStore } from '../state/store';
 import { isAdmin } from '../lib/permissions';
-import { fmtStamp } from '../lib/dates';
+import { fmtStamp, todayIso } from '../lib/dates';
 import { isLate } from '../lib/selectors';
+import type { Task } from '../lib/types';
 import { resetDemo } from '../data/demoBackend';
 import { AvailDot, Avatar, IconButton } from './ui';
 import { SearchPalette } from './SearchPalette';
@@ -28,12 +29,12 @@ export function Layout({ children }: { children: ReactNode }) {
   }, []);
   if (!me) return null;
 
-  const myLate = snap.tasks.filter((t) => t.assignee_id === me.id && isLate(t)).length;
-  const nav = [
-    { to: '/', label: 'Ma journée', icon: Sun, count: myLate },
+  const day = myDay(snap.tasks, me.id);
+  const nav: { to: string; label: string; icon: typeof Sun; count?: number; tone?: 'aqua'; hint?: string }[] = [
+    { to: '/', label: 'Ma journée', icon: Sun },
     { to: '/annonces', label: 'Annonces', icon: Megaphone, count: unreadAnnouncements.length },
     { to: '/projets', label: 'Projets', icon: FolderKanban },
-    { to: '/taches', label: 'Tâches', icon: ListChecks },
+    { to: '/taches', label: 'Tâches', icon: ListChecks, count: day.total, tone: day.late ? undefined : 'aqua', hint: day.hint },
     { to: '/messages', label: 'Messages', icon: MessagesSquare, count: unreadMessages },
     { to: '/agenda', label: 'Agenda', icon: CalendarDays },
     { to: '/absences', label: 'Absences', icon: Palmtree, count: me.role === 'admin' ? snap.absences.filter((a) => a.status === 'en_attente').length : 0 },
@@ -64,7 +65,7 @@ export function Layout({ children }: { children: ReactNode }) {
         >
           <n.icon size={19} />
           <span className="flex-1">{n.label}</span>
-          {!!n.count && <span className="rounded-mab-pilule bg-mab-rose px-2 text-xs font-semibold leading-5">{n.count}</span>}
+          {!!n.count && <span title={n.hint} className={`rounded-mab-pilule px-2 text-xs font-semibold leading-5 ${n.tone === 'aqua' ? 'bg-mab-aqua text-mab-aqua-encre' : 'bg-mab-rose'}`}>{n.count}</span>}
         </NavLink>
       ))}
       {isAdmin(me) && (
@@ -197,15 +198,15 @@ function MobileNav({ onMore }: { onMore: () => void }) {
   const { me, snap, unreadMessages, unreadAnnouncements } = useStore();
   const loc = useLocation();
   if (!me || /^\/messages\/[^/]+/.test(loc.pathname)) return null;
-  const late = snap.tasks.filter((t) => t.assignee_id === me.id && isLate(t)).length;
+  const day = myDay(snap.tasks, me.id);
   const more = unreadAnnouncements.length + (me.role === 'admin' ? snap.absences.filter((a) => a.status === 'en_attente').length : 0);
   const items = [
-    { to: '/', label: 'Journée', icon: Sun, count: late },
-    { to: '/taches', label: 'Tâches', icon: ListChecks },
+    { to: '/', label: 'Journée', icon: Sun, count: 0 },
+    { to: '/taches', label: 'Tâches', icon: ListChecks, count: day.total, aqua: !day.late },
     { to: '/messages', label: 'Messages', icon: MessagesSquare, count: unreadMessages },
     { to: '/agenda', label: 'Agenda', icon: CalendarDays },
   ];
-  const Badge = ({ n }: { n?: number }) => (n ? <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-mab-rose px-1 text-[10px] font-bold text-white">{n > 99 ? '99+' : n}</span> : null);
+  const Badge = ({ n, aqua }: { n?: number; aqua?: boolean }) => (n ? <span className={`absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold ${aqua ? 'bg-mab-aqua text-mab-aqua-encre' : 'bg-mab-rose text-white'}`}>{n > 99 ? '99+' : n}</span> : null);
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-mab-filet bg-white/95 backdrop-blur lg:hidden" aria-label="Navigation principale">
       <div className="mx-auto grid h-16 max-w-lg grid-cols-5">
@@ -219,7 +220,7 @@ function MobileNav({ onMore }: { onMore: () => void }) {
             {({ isActive }) => (
               <>
                 <span className={`relative grid h-7 w-12 place-items-center rounded-mab-pilule transition ${isActive ? 'bg-mab-wash-2' : ''}`}>
-                  <it.icon size={20} /><Badge n={it.count} />
+                  <it.icon size={20} /><Badge n={it.count} aqua={'aqua' in it && it.aqua} />
                 </span>
                 {it.label}
               </>
@@ -233,6 +234,16 @@ function MobileNav({ onMore }: { onMore: () => void }) {
       </div>
     </nav>
   );
+}
+
+/** Mes tâches de la journée : à faire aujourd'hui + en retard. */
+function myDay(tasks: Task[], meId: string) {
+  const today = todayIso();
+  const mine = tasks.filter((t) => t.assignee_id === meId && t.status !== 'fait' && t.due_date && t.due_date <= today);
+  const late = mine.filter(isLate).length;
+  const total = mine.length;
+  const hint = total ? `${total} tâche${total > 1 ? 's' : ''} pour aujourd’hui${late ? `, dont ${late} en retard` : ''}` : undefined;
+  return { total, late, hint };
 }
 
 function InstallHint() {
