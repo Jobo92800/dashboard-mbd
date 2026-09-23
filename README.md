@@ -102,3 +102,28 @@ src/
 supabase/migrations/  Schéma de la base + règles d’accès
 netlify/functions/    Invitation d’un membre (seule à utiliser la clé secrète)
 ```
+
+## Branchements (état au 23 sept. 2026)
+
+| Service | Où | Rôle |
+| --- | --- | --- |
+| GitHub | `Jobo92800/dashboard-mbd`, branche `main` | Le code ; chaque envoi redéploie le site |
+| Supabase | projet `dashboard-mbd` (`bwovbgigpfjoktipsqre`, Irlande) | Base, comptes, fichiers |
+| Netlify | site relié au dépôt GitHub | Hébergement, fonctions (invitations, récaps) |
+
+### Faire évoluer la base (migrations)
+
+Chaque changement de structure est un nouveau fichier numéroté dans
+`supabase/migrations/` (`004_…sql`, `005_…sql`…). **On ne modifie jamais un
+fichier déjà appliqué.**
+
+```bash
+npm run db:status   # ce qui est appliqué en ligne / en attente
+npm run db:push     # applique les nouveaux fichiers sur Supabase
+```
+
+Ordre à respecter : 1. `db:push` (la base d’abord) → 2. commit + push GitHub
+(le site suit, Netlify redéploie tout seul).
+
+En local, sans fichier `.env.local`, l’appli reste en **mode démo** : on peut
+tout essayer sans toucher aux vraies données.
