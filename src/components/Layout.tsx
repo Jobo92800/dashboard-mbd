@@ -236,13 +236,15 @@ function MobileNav({ onMore }: { onMore: () => void }) {
   );
 }
 
-/** Mes tâches de la journée : à faire aujourd'hui + en retard. */
+/** Mes tâches à traiter : en retard, du jour, et sans échéance (les tâches datées plus tard ne comptent pas). */
 function myDay(tasks: Task[], meId: string) {
   const today = todayIso();
-  const mine = tasks.filter((t) => t.assignee_id === meId && t.status !== 'fait' && t.due_date && t.due_date <= today);
+  const mine = tasks.filter((t) => t.assignee_id === meId && t.status !== 'fait' && (!t.due_date || t.due_date <= today));
   const late = mine.filter(isLate).length;
+  const noDate = mine.filter((t) => !t.due_date).length;
   const total = mine.length;
-  const hint = total ? `${total} tâche${total > 1 ? 's' : ''} pour aujourd’hui${late ? `, dont ${late} en retard` : ''}` : undefined;
+  const details = [late && `${late} en retard`, noDate && `${noDate} sans échéance`].filter(Boolean).join(' et ');
+  const hint = total ? `${total} tâche${total > 1 ? 's' : ''} à faire${details ? `, dont ${details}` : ''}` : undefined;
   return { total, late, hint };
 }
 
