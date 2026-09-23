@@ -5,6 +5,8 @@ import type { Profile } from '../lib/types';
 import { isDone, isLate, sortTasks } from '../lib/selectors';
 import { AVAIL_LABEL, AvailDot, Avatar, Card, PageTitle } from '../components/ui';
 import { TaskRow } from '../components/TaskRow';
+import { absenceKind, absenceOn } from '../lib/absences';
+import { todayIso } from '../lib/dates';
 
 export default function Team() {
   const { snap } = useStore();
@@ -56,7 +58,18 @@ function PersonCard({ p, max, active, onClick }: { p: Profile; max: number; acti
             <p className="truncate text-sm text-mab-texte">{p.job_title}</p>
           </div>
         </div>
-        <p className="mt-3 text-sm"><b className="font-medium">{AVAIL_LABEL[p.availability]}</b>{p.availability_note && <span className="text-mab-texte"> · {p.availability_note}</span>}</p>
+        {(() => {
+          const away = absenceOn(snap.absences.filter((a) => a.status === 'validee'), p.id, todayIso());
+          const next = snap.absences.filter((a) => a.user_id === p.id && a.status === 'validee' && a.start_date > todayIso()).sort((a, b) => (a.start_date < b.start_date ? -1 : 1))[0];
+          return (
+            <>
+              {away
+                ? <p className="mt-3 text-sm"><b className="font-medium">🌴 {absenceKind(away, me)}</b><span className="text-mab-texte"> jusqu’au {away.end_date.split('-').reverse().slice(0, 2).join('/')}</span></p>
+                : <p className="mt-3 text-sm"><b className="font-medium">{AVAIL_LABEL[p.availability]}</b>{p.availability_note && <span className="text-mab-texte"> · {p.availability_note}</span>}</p>}
+              {!away && next && <p className="text-xs text-mab-texte">Prochaine absence : {next.start_date.split('-').reverse().slice(0, 2).join('/')} → {next.end_date.split('-').reverse().slice(0, 2).join('/')}</p>}
+            </>
+          );
+        })()}
         <div className="mt-4">
           <div className="mb-1 flex justify-between text-xs text-mab-texte">
             <span>Charge : {open.length} tâche{open.length > 1 ? 's' : ''} ouverte{open.length > 1 ? 's' : ''}</span>

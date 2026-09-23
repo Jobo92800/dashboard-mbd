@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CalendarDays, FolderKanban, ListChecks, LogOut, Menu, MessagesSquare, Search, ShieldCheck, Sun, Users } from 'lucide-react';
+import { Bell, BookOpen, CalendarDays, FolderKanban, ListChecks, LogOut, Megaphone, Menu, MessagesSquare, Palmtree, Search, ShieldCheck, Sun, Users } from 'lucide-react';
 import { useStore } from '../state/store';
 import { isAdmin } from '../lib/permissions';
 import { fmtStamp } from '../lib/dates';
@@ -12,7 +12,7 @@ import { useToast } from '../state/toast';
 import { setAppBadge, showSystemNotification, useInstall } from '../lib/device';
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { me, snap, mode, loaded, unreadMessages } = useStore();
+  const { me, snap, mode, loaded, unreadMessages, unreadAnnouncements } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const loc = useLocation();
@@ -29,10 +29,13 @@ export function Layout({ children }: { children: ReactNode }) {
   const myLate = snap.tasks.filter((t) => t.assignee_id === me.id && isLate(t)).length;
   const nav = [
     { to: '/', label: 'Ma journée', icon: Sun, count: myLate },
+    { to: '/annonces', label: 'Annonces', icon: Megaphone, count: unreadAnnouncements.length },
     { to: '/projets', label: 'Projets', icon: FolderKanban },
     { to: '/taches', label: 'Tâches', icon: ListChecks },
     { to: '/messages', label: 'Messages', icon: MessagesSquare, count: unreadMessages },
     { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+    { to: '/absences', label: 'Absences', icon: Palmtree, count: me.role === 'admin' ? snap.absences.filter((a) => a.status === 'en_attente').length : 0 },
+    { to: '/documents', label: 'Documents', icon: BookOpen },
     { to: '/equipe', label: 'Équipe', icon: Users },
   ];
 

@@ -1,10 +1,13 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, LogOut, MessageSquarePlus, Pencil, Search, Send, Trash2, UserPlus, Users } from 'lucide-react';
+import { ArrowLeft, FileText, ListPlus, LogOut, MessageSquarePlus, Paperclip, Pencil, Pin, Reply, Search, Send, SmilePlus, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { isToday, isYesterday, parseISO, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useStore } from '../state/store';
-import type { Conversation, Profile } from '../lib/types';
+import type { Conversation, Message, Profile } from '../lib/types';
+import { useToast } from '../state/toast';
+import { useOpenAttachment } from '../components/TaskExtras';
+import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { conversationName } from '../lib/conversations';
 import { Avatar, Button, Empty, Field, IconButton, Input, Modal, PeoplePicker, Textarea } from '../components/ui';
 
@@ -137,30 +140,72 @@ function dayLabel(iso: string) {
   return format(d, 'EEEE d MMMM', { locale: fr });
 }
 
+const EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '✅'];
+
+function excerpt(text: string, n = 80) {
+  const t = text.replace(/\s+/g, ' ').trim();
+  return t.length > n ? t.slice(0, n) + '…' : t;
+}
+
 function Thread({ conv }: { conv: Conversation }) {
-  const { snap, me, byId, sendMessage, markConversationRead, unreadByConv, deleteMessage } = useStore();
+  const { snap, me, byId, sendMessage, markConversationRead, unreadByConv, deleteMessage, editMessage, toggleReaction, togglePin } = useStore();
+  const toast = useToast();
+  const openAtt = useOpenAttachment();
   const nav = useNavigate();
   const [text, setText] = useState('');
-  const [managing, setManaging] = useState(false);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [sending, setSending] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [picker, setPicker] = useState<string | null>(null);
+  const [pinsOpen, setPinsOpen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const messages = useMemo(
     () => snap.messages.filter((m) => m.conversation_id === conv.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
     [snap.messages, conv.id],
   );
+  const byMsg = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
   const unread = unreadByConv.get(conv.id) ?? 0;
   const group = conv.member_ids.length > 2 || !!conv.title;
   const name = conversationName(conv, me!.id, byId);
   const members = conv.member_ids.map((x) => byId.get(x)).filter(Boolean) as Profile[];
+  const pinned = conv.pinned_ids.map((id) => byMsg.get(id)).filter(Boolean) as Message[];
+  const [managing, setManaging] = useState(false);
 
   useEffect(() => { if (unread > 0) markConversationRead(conv.id); }, [unread, conv.id, markConversationRead]);
   useEffect(() => { bottom.current?.scrollIntoView({ block: 'end' }); }, [messages.length]);
-  useEffect(() => { input.current?.focus(); }, [conv.id]);
+  useEffect(() => { input.current?.focus(); }, [conv.id, replyTo]);
 
-  const send = () => {
-    if (!text.trim()) return;
-    sendMessage(conv, text);
-    setText('');
+  const send = async () => {
+    if ((!text.trim() && !files.length) || sending) return;
+    setSending(true);
+    try {
+      await sendMessage(conv, text, { replyTo: replyTo?.id ?? null, files });
+      setText(''); setFiles([]); setReplyTo(null);
+      if (input.current) input.current.style.height = 'auto';
+    } catch (e) { toast((e as Error).message, 'erreur'); }
+    finally { setSending(false); }
+  };
+
+  const jumpTo = (id: string) => {
+    document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setFlash(id);
+    setTimeout(() => setFlash(null), 1600);
+  };
+
+  const toTask = (m: Message) => {
+    const author = byId.get(m.author_id)?.full_name ?? '';
+    setTaskDraft({
+      title: excerpt(m.body || m.attachments.map((a) => a.name).join(', '), 100),
+      note: `Depuis la conversation « ${name} » — message ${/^[aeiouyéèêh]/i.test(author) ? 'd’' : 'de '}${author} (${format(parseISO(m.created_at), "d MMM 'à' HH:mm", { locale: fr })}) :\n${m.body}`,
+      attachments: m.attachments,
+    });
   };
 
   return (
@@ -177,38 +222,140 @@ function Thread({ conv }: { conv: Conversation }) {
         <Button variant="discret" onClick={() => setManaging(true)}>{group ? <><Users size={15} /> Groupe</> : <><UserPlus size={15} /> Ajouter</>}</Button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-mab-wash px-4 py-4 sm:px-6">
+      {pinned.length > 0 && (
+        <div className="border-b border-mab-filet bg-white px-4 py-2">
+          <button onClick={() => setPinsOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-sm" aria-expanded={pinsOpen}>
+            <Pin size={14} className="shrink-0 text-mab-rose" />
+            <span className="font-medium">{pinned.length} message{pinned.length > 1 ? 's' : ''} épinglé{pinned.length > 1 ? 's' : ''}</span>
+            {!pinsOpen && <span className="truncate text-mab-texte">· {excerpt(pinned[pinned.length - 1].body, 60)}</span>}
+          </button>
+          {pinsOpen && (
+            <div className="mt-2 grid gap-1">
+              {pinned.map((m) => (
+                <button key={m.id} onClick={() => { jumpTo(m.id); setPinsOpen(false); }} className="rounded-mab-etiquette px-2 py-1.5 text-left text-sm hover:bg-mab-wash">
+                  <b>{byId.get(m.author_id)?.full_name.split(' ')[0]}</b> : {excerpt(m.body || m.attachments.map((a) => a.name).join(', '), 120)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div
+        className={`relative min-h-0 flex-1 overflow-y-auto bg-mab-wash px-4 py-4 sm:px-6 ${dragOver ? 'ring-2 ring-inset ring-mab-aqua' : ''}`}
+        onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragOver(true); } }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); setFiles((f) => [...f, ...Array.from(e.dataTransfer.files)]); }}
+        onClick={() => setPicker(null)}
+      >
         {messages.length === 0 && <p className="py-10 text-center text-sm text-mab-texte">Écris le premier message.</p>}
         {messages.map((m, i) => {
           const prev = messages[i - 1];
           const mine = m.author_id === me!.id;
           const newDay = !prev || prev.created_at.slice(0, 10) !== m.created_at.slice(0, 10);
-          const sameBlock = prev && !newDay && prev.author_id === m.author_id && Date.parse(m.created_at) - Date.parse(prev.created_at) < 5 * 60_000;
+          const sameBlock = prev && !newDay && prev.author_id === m.author_id && !m.reply_to && Date.parse(m.created_at) - Date.parse(prev.created_at) < 5 * 60_000;
           const author = byId.get(m.author_id);
+          const parent = m.reply_to ? byMsg.get(m.reply_to) : undefined;
+          const reactions = snap.reactions.filter((r) => r.message_id === m.id);
+          const grouped = EMOJIS.concat([...new Set(reactions.map((r) => r.emoji))].filter((e) => !EMOJIS.includes(e)))
+            .map((e) => ({ e, users: reactions.filter((r) => r.emoji === e).map((r) => r.user_id) }))
+            .filter((g) => g.users.length);
+          const isPinned = conv.pinned_ids.includes(m.id);
           return (
             <Fragment key={m.id}>
               {newDay && <p className="my-4 text-center text-xs font-medium capitalize text-mab-gris">{dayLabel(m.created_at)}</p>}
-              <div className={`group flex items-end gap-2 ${mine ? 'justify-end' : ''} ${sameBlock ? 'mt-1' : 'mt-3'}`}>
+              <div id={`msg-${m.id}`} className={`group relative flex items-end gap-2 rounded-mab-champ transition-colors ${mine ? 'justify-end' : ''} ${sameBlock ? 'mt-1' : 'mt-3'} ${flash === m.id ? 'bg-mab-wash-2' : ''}`}>
                 {!mine && <span className="w-8 shrink-0">{!sameBlock && <Avatar p={author} size={32} />}</span>}
-                {mine && (
-                  <button aria-label="Supprimer le message" className="mb-2 text-mab-gris-doux opacity-0 transition hover:text-mab-erreur group-hover:opacity-100" onClick={() => confirm('Supprimer ce message pour tout le monde ?') && deleteMessage(m.id)}>
-                    <Trash2 size={14} />
-                  </button>
-                )}
-                <div className={`max-w-[78%] sm:max-w-[65%] ${mine ? 'items-end' : ''} flex flex-col`}>
+                <div className={`flex max-w-[78%] flex-col sm:max-w-[65%] ${mine ? 'items-end' : 'items-start'}`}>
                   {!mine && group && !sameBlock && <span className="mb-1 ml-1 text-xs font-medium text-mab-texte">{author?.full_name}</span>}
-                  <div
-                    title={format(parseISO(m.created_at), "d MMM 'à' HH:mm", { locale: fr })}
-                    className={`whitespace-pre-wrap break-words rounded-[18px] px-4 py-2.5 text-[15px] leading-relaxed ${
-                      mine ? 'rounded-br-md bg-mab-aqua-encre text-white' : 'rounded-bl-md border border-mab-filet bg-white text-mab-encre'
-                    }`}
-                  >
-                    {linkify(m.body)}
-                  </div>
-                  {(!messages[i + 1] || messages[i + 1].author_id !== m.author_id) && (
-                    <span className="mt-1 px-1 text-[11px] text-mab-gris-doux">{format(parseISO(m.created_at), 'HH:mm')}</span>
+                  {editingId === m.id ? (
+                    <div className="w-[min(480px,70vw)]">
+                      <textarea
+                        autoFocus
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (editText.trim()) editMessage(m, editText); setEditingId(null); }
+                          if (e.key === 'Escape') { e.stopPropagation(); setEditingId(null); }
+                        }}
+                        rows={3}
+                        className="w-full rounded-mab-champ border border-mab-aqua bg-white px-3 py-2 text-[15px] focus:outline-none focus:ring-2 focus:ring-mab-aqua/30"
+                      />
+                      <p className="text-right text-[11px] text-mab-gris-doux">Entrée pour enregistrer · Échap pour annuler</p>
+                    </div>
+                  ) : (
+                    <div
+                      title={format(parseISO(m.created_at), "d MMM 'à' HH:mm", { locale: fr })}
+                      className={`whitespace-pre-wrap break-words rounded-[18px] px-4 py-2.5 text-[15px] leading-relaxed ${
+                        mine ? 'rounded-br-md bg-mab-aqua-encre text-white' : 'rounded-bl-md border border-mab-filet bg-white text-mab-encre'
+                      } ${isPinned ? 'ring-2 ring-mab-filet-rose' : ''}`}
+                    >
+                      {parent && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); jumpTo(parent.id); }}
+                          className={`mb-1.5 block w-full rounded-mab-etiquette border-l-[3px] px-2.5 py-1 text-left text-xs ${mine ? 'border-mab-aqua-clair bg-white/10 text-mab-profond-texte' : 'border-mab-aqua bg-mab-wash text-mab-texte'}`}
+                        >
+                          <b>{byId.get(parent.author_id)?.full_name.split(' ')[0]}</b> · {excerpt(parent.body || '📎 pièce jointe', 90)}
+                        </button>
+                      )}
+                      {m.reply_to && !parent && <span className="mb-1 block text-xs italic opacity-70">Réponse à un message supprimé</span>}
+                      {m.body && linkify(m.body)}
+                      {m.attachments.length > 0 && (
+                        <span className={`grid gap-1 ${m.body ? 'mt-2' : ''}`}>
+                          {m.attachments.map((a) => (
+                            <button
+                              key={a.id}
+                              onClick={(e) => { e.stopPropagation(); openAtt(a); }}
+                              className={`flex items-center gap-2 rounded-mab-etiquette px-2.5 py-1.5 text-left text-sm ${mine ? 'bg-white/15 hover:bg-white/25' : 'bg-mab-wash hover:bg-mab-wash-2'}`}
+                            >
+                              <FileText size={15} className="shrink-0" /><span className="truncate">{a.name}</span>
+                            </button>
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {grouped.length > 0 && (
+                    <div className={`-mt-1.5 flex flex-wrap gap-1 ${mine ? 'justify-end pr-2' : 'pl-2'}`}>
+                      {grouped.map((g) => (
+                        <button
+                          key={g.e}
+                          onClick={(e) => { e.stopPropagation(); toggleReaction(m, g.e); }}
+                          title={g.users.map((u) => (u === me!.id ? 'Toi' : byId.get(u)?.full_name.split(' ')[0])).join(', ')}
+                          className={`flex items-center gap-1 rounded-mab-pilule border px-1.5 py-0.5 text-xs shadow-sm ${g.users.includes(me!.id) ? 'border-mab-aqua bg-mab-wash-2' : 'border-mab-filet bg-white'}`}
+                        >
+                          <span>{g.e}</span><span className="font-semibold text-mab-texte">{g.users.length}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {(!messages[i + 1] || messages[i + 1].author_id !== m.author_id || m.edited_at || isPinned) && (
+                    <span className="mt-1 px-1 text-[11px] text-mab-gris-doux">
+                      {format(parseISO(m.created_at), 'HH:mm')}{m.edited_at && ' · modifié'}{isPinned && ' · 📌'}
+                    </span>
                   )}
                 </div>
+
+                {editingId !== m.id && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className={`absolute -top-4 z-10 hidden items-center gap-0.5 rounded-mab-pilule border border-mab-filet bg-white p-0.5 shadow-mab-carte group-hover:flex ${picker === m.id ? '!flex' : ''} ${mine ? 'right-2' : 'left-12'}`}
+                  >
+                    <IconButton label="Réagir" className="!h-7 !w-7" onClick={() => setPicker(picker === m.id ? null : m.id)}><SmilePlus size={15} /></IconButton>
+                    <IconButton label="Répondre" className="!h-7 !w-7" onClick={() => setReplyTo(m)}><Reply size={15} /></IconButton>
+                    <IconButton label={isPinned ? 'Désépingler' : 'Épingler'} className="!h-7 !w-7" onClick={() => togglePin(conv, m.id)}><Pin size={15} /></IconButton>
+                    <IconButton label="Transformer en tâche" className="!h-7 !w-7" onClick={() => toTask(m)}><ListPlus size={15} /></IconButton>
+                    {mine && <IconButton label="Modifier" className="!h-7 !w-7" onClick={() => { setEditingId(m.id); setEditText(m.body); }}><Pencil size={14} /></IconButton>}
+                    {mine && <IconButton label="Supprimer" className="!h-7 !w-7 hover:!text-mab-erreur" onClick={() => confirm('Supprimer ce message pour tout le monde ?') && deleteMessage(m.id)}><Trash2 size={14} /></IconButton>}
+                    {picker === m.id && (
+                      <div className={`absolute top-9 flex gap-0.5 rounded-mab-pilule border border-mab-filet bg-white p-1 shadow-mab-flottante ${mine ? 'right-0' : 'left-0'}`}>
+                        {EMOJIS.map((e) => (
+                          <button key={e} onClick={() => { toggleReaction(m, e); setPicker(null); }} className="grid h-8 w-8 place-items-center rounded-full text-lg hover:bg-mab-wash-2" aria-label={`Réagir ${e}`}>{e}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </Fragment>
           );
@@ -216,28 +363,54 @@ function Thread({ conv }: { conv: Conversation }) {
         <div ref={bottom} />
       </div>
 
-      <div className="flex items-end gap-2 border-t border-mab-filet bg-white p-3">
-        <textarea
-          ref={input}
-          rows={1}
-          value={text}
-          onChange={(e) => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`; }}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); (e.target as HTMLTextAreaElement).style.height = 'auto'; } }}
-          placeholder={`Écrire à ${group ? 'tout le groupe' : name.split(' ')[0]}…`}
-          className="max-h-40 min-h-[44px] flex-1 resize-none rounded-mab-champ border border-mab-filet bg-white px-4 py-2.5 text-[15px] focus:border-mab-aqua focus:outline-none focus:ring-2 focus:ring-mab-aqua/30"
-        />
-        <button
-          aria-label="Envoyer"
-          disabled={!text.trim()}
-          onClick={send}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-mab-rose text-white shadow-mab-cta transition hover:bg-mab-rose-texte disabled:bg-mab-terrain-2-fond disabled:text-mab-gris-doux disabled:shadow-none"
-        >
-          <Send size={18} />
-        </button>
+      <div className="border-t border-mab-filet bg-white">
+        {replyTo && (
+          <div className="flex items-center gap-2 border-b border-mab-filet bg-mab-wash px-4 py-2 text-sm">
+            <Reply size={15} className="shrink-0 text-mab-aqua-texte" />
+            <span className="min-w-0 flex-1 truncate">Réponse à <b>{byId.get(replyTo.author_id)?.full_name.split(' ')[0]}</b> : {excerpt(replyTo.body || '📎 pièce jointe', 90)}</span>
+            <IconButton label="Annuler la réponse" className="!h-7 !w-7" onClick={() => setReplyTo(null)}><X size={15} /></IconButton>
+          </div>
+        )}
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-3 pt-3">
+            {files.map((f, i) => (
+              <span key={i} className="flex items-center gap-1.5 rounded-mab-pilule border border-mab-filet bg-mab-wash py-1 pl-3 pr-1 text-xs">
+                <FileText size={13} /> <span className="max-w-[180px] truncate">{f.name}</span>
+                <button aria-label={`Retirer ${f.name}`} onClick={() => setFiles(files.filter((_, j) => j !== i))} className="grid h-5 w-5 place-items-center rounded-full hover:bg-mab-rail"><X size={12} /></button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex items-end gap-2 p-3">
+          <IconButton label="Joindre un fichier" onClick={() => fileRef.current?.click()}><Paperclip size={18} /></IconButton>
+          <input ref={fileRef} type="file" multiple hidden onChange={(e) => { setFiles((f) => [...f, ...Array.from(e.target.files ?? [])]); e.target.value = ''; }} />
+          <textarea
+            ref={input}
+            rows={1}
+            value={text}
+            onChange={(e) => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`; }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
+              if (e.key === 'Escape' && replyTo) { e.stopPropagation(); setReplyTo(null); }
+            }}
+            onPaste={(e) => { const pasted = Array.from(e.clipboardData.files); if (pasted.length) { e.preventDefault(); setFiles((f) => [...f, ...pasted]); } }}
+            placeholder={`Écrire à ${group ? 'tout le groupe' : name.split(' ')[0]}…`}
+            className="max-h-40 min-h-[44px] flex-1 resize-none rounded-mab-champ border border-mab-filet bg-white px-4 py-2.5 text-[15px] focus:border-mab-aqua focus:outline-none focus:ring-2 focus:ring-mab-aqua/30"
+          />
+          <button
+            aria-label="Envoyer"
+            disabled={(!text.trim() && !files.length) || sending}
+            onClick={send}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-mab-rose text-white shadow-mab-cta transition hover:bg-mab-rose-texte disabled:bg-mab-terrain-2-fond disabled:text-mab-gris-doux disabled:shadow-none"
+          >
+            <Send size={18} className={sending ? 'animate-pulse' : ''} />
+          </button>
+        </div>
+        <p className="px-4 pb-2 text-[11px] text-mab-gris-doux">Entrée pour envoyer · Maj + Entrée pour aller à la ligne · glisse ou colle un fichier pour le joindre</p>
       </div>
-      <p className="bg-white px-4 pb-2 text-[11px] text-mab-gris-doux">Entrée pour envoyer · Maj + Entrée pour aller à la ligne</p>
 
       <ManageModal open={managing} conv={conv} onClose={() => setManaging(false)} />
+      <TaskModal draft={taskDraft} onClose={() => setTaskDraft(null)} />
     </>
   );
 }

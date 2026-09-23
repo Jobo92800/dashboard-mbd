@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { ExternalLink, FileText, GripVertical, Link2, Paperclip, Plus, Trash2, Upload, X } from 'lucide-react';
-import type { ChecklistItem, Task } from '../lib/types';
+import type { Attachment, ChecklistItem, Task } from '../lib/types';
 import { uid } from '../data/backend';
 import { useStore } from '../state/store';
 import { useToast } from '../state/toast';
@@ -91,7 +91,39 @@ const fmtSize = (n?: number) => (!n ? '' : n < 1024 * 1024 ? `${Math.round(n / 1
 
 /** Liens et fichiers joints à une tâche (enregistrés immédiatement). */
 export function Attachments({ task, disabled }: { task: Task; disabled?: boolean }) {
-  const { addAttachment, removeAttachment, openAttachment } = useStore();
+  const { addAttachment, removeAttachment } = useStore();
+  return (
+    <AttachmentList
+      items={task.attachments}
+      disabled={disabled}
+      onAdd={(input) => addAttachment(task, input)}
+      onRemove={(id) => removeAttachment(task, id)}
+    />
+  );
+}
+
+export function useOpenAttachment() {
+  const { openAttachment } = useStore();
+  const toast = useToast();
+  return async (a: Attachment) => {
+    try {
+      const href = await openAttachment(a);
+      if (href.startsWith('data:')) {
+        const w = window.open();
+        if (w) w.document.write(`<title>${a.name.replace(/</g, '')}</title><iframe src="${href}" style="border:0;width:100%;height:100%"></iframe>`);
+      } else window.open(href, '_blank', 'noopener');
+    } catch (e) { toast((e as Error).message, 'erreur'); }
+  };
+}
+
+/** Liste de liens et fichiers joints (tâches, documents). */
+export function AttachmentList({ items, onAdd, onRemove, disabled }: {
+  items: Attachment[];
+  onAdd: (input: { file?: File; name?: string; url?: string }) => Promise<void>;
+  onRemove: (id: string) => void;
+  disabled?: boolean;
+}) {
+  const open = useOpenAttachment();
   const toast = useToast();
   const [linkOpen, setLinkOpen] = useState(false);
   const [url, setUrl] = useState('');
@@ -104,24 +136,15 @@ export function Attachments({ task, disabled }: { task: Task; disabled?: boolean
     if (!files?.length) return;
     setBusy(true);
     try {
-      for (const f of Array.from(files)) await addAttachment(task, { file: f });
+      for (const f of Array.from(files)) await onAdd({ file: f });
       toast(files.length > 1 ? `${files.length} fichiers ajoutés` : 'Fichier ajouté');
     } catch (e) { toast((e as Error).message, 'erreur'); }
     finally { setBusy(false); if (fileRef.current) fileRef.current.value = ''; }
   };
   const addLink = async () => {
     if (!url.trim()) return;
-    await addAttachment(task, { url, name });
+    await onAdd({ url, name });
     setUrl(''); setName(''); setLinkOpen(false);
-  };
-  const open = async (a: Task['attachments'][number]) => {
-    try {
-      const href = await openAttachment(a);
-      if (href.startsWith('data:')) {
-        const w = window.open();
-        if (w) w.document.write(`<title>${a.name}</title><iframe src="${href}" style="border:0;width:100%;height:100%"></iframe>`);
-      } else window.open(href, '_blank', 'noopener');
-    } catch (e) { toast((e as Error).message, 'erreur'); }
   };
 
   return (
@@ -132,20 +155,20 @@ export function Attachments({ task, disabled }: { task: Task; disabled?: boolean
       className={`rounded-mab-champ transition ${over ? 'bg-mab-wash-2 ring-2 ring-mab-aqua' : ''}`}
     >
       <div className="grid gap-1.5">
-        {task.attachments.map((a) => (
+        {items.map((a) => (
           <div key={a.id} className="group flex items-center gap-3 rounded-mab-champ border border-mab-filet bg-white px-3 py-2">
             {a.kind === 'lien' ? <Link2 size={16} className="shrink-0 text-mab-aqua-texte" /> : <FileText size={16} className="shrink-0 text-mab-violet-texte" />}
             <button type="button" onClick={() => open(a)} className="min-w-0 flex-1 truncate text-left text-sm font-medium text-mab-encre hover:underline">{a.name}</button>
             <span className="text-xs text-mab-gris-doux">{fmtSize(a.size)}</span>
             <ExternalLink size={14} className="text-mab-gris-doux" />
             {!disabled && (
-              <IconButton label="Retirer" className="!h-7 !w-7 opacity-0 group-hover:opacity-100" onClick={() => confirm(`Retirer « ${a.name} » ?`) && removeAttachment(task, a.id)}>
+              <IconButton label="Retirer" className="!h-7 !w-7 opacity-0 group-hover:opacity-100" onClick={() => confirm(`Retirer « ${a.name} » ?`) && onRemove(a.id)}>
                 <Trash2 size={14} />
               </IconButton>
             )}
           </div>
         ))}
-        {task.attachments.length === 0 && <p className="text-sm text-mab-gris-doux">Aucune pièce jointe.{!disabled && ' Glisse un fichier ici.'}</p>}
+        {items.length === 0 && <p className="text-sm text-mab-gris-doux">Aucune pièce jointe.{!disabled && ' Glisse un fichier ici.'}</p>}
       </div>
       {!disabled && (
         <>

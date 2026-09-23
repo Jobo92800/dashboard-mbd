@@ -37,5 +37,17 @@ expliquer en français, sans jargon.
     Netlify planifiées `recap-lundi` (6 h UTC) et `bilan-vendredi` (15 h UTC),
     envoi Brevo (`BREVO_API_KEY`), bouton de test `envoyer-recap`.
 
+- Lot « équipe » (migration 004) : annonces + accusés de lecture (admins
+  publient) ; messagerie : réactions (table `reactions`), `reply_to`,
+  `attachments`, `edited_at`, épingles (`conversations.pinned_ids`),
+  « transformer en tâche » ; base documentaire `docs` (mise en forme maison
+  `src/lib/markdown.tsx`, sans HTML injecté, `admins_only`) ; absences avec
+  validation admin, visibles dans agenda / équipe / Ma journée, alerte dans
+  les fiches tâche et événement. Buckets privés `messagerie/<conv>/…` et
+  `documents/<doc>/…`. Limite connue : le motif « Maladie » est masqué à
+  l'écran pour les membres, mais reste lisible via l'API.
+- Mise en production : tester en démo → valider 004 en transaction annulée →
+  demander à Jonathan → `db:push` → aperçu Netlify → production.
+
 ## Règles
 - Pas de push GitHub ni de déploiement Netlify sans demande explicite.

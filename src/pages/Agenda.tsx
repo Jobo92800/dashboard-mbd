@@ -10,7 +10,9 @@ import { isDone, isLate } from '../lib/selectors';
 import { TaskRow } from '../components/TaskRow';
 import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { EventModal, fmtDur } from '../components/EventModal';
-import { AvatarStack, Button, Card, IconButton, PageTitle } from '../components/ui';
+import { Avatar, AvatarStack, Button, Card, IconButton, PageTitle } from '../components/ui';
+import { absenceKind, absenceRange } from '../lib/absences';
+import { KIND_COLOR } from './Absences';
 
 export default function Agenda() {
   const { snap, byId, me } = useStore();
@@ -25,6 +27,8 @@ export default function Agenda() {
   const events = useMemo(() => snap.events.filter((e) => !person || e.participant_ids.includes(person)), [snap.events, person]);
   const projectColor = (id: string | null) => snap.projects.find((p) => p.id === id)?.color ?? '#9babab';
 
+  const absences = snap.absences.filter((a) => a.status !== 'refusee' && (!person || a.user_id === person));
+  const absentOn = (iso: string) => absences.filter((a) => a.start_date <= iso && a.end_date >= iso);
   const dayTasks = tasks.filter((t) => t.due_date === day);
   const dayEvents = events.filter((e) => e.date === day).sort((a, b) => (a.time < b.time ? -1 : 1));
 
@@ -81,6 +85,11 @@ export default function Agenda() {
                   className={`flex min-h-[74px] flex-col items-stretch gap-1 bg-white p-1.5 text-left transition sm:min-h-[96px] ${isSameMonth(d, cursor) ? '' : 'bg-mab-wash/60 text-mab-gris-doux'} ${selected ? '!bg-mab-wash-2 ring-2 ring-inset ring-mab-aqua' : 'hover:bg-mab-wash'}`}
                 >
                   <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-mab-aqua-encre text-white' : ''}`}>{format(d, 'd')}</span>
+                  {absentOn(iso).length > 0 && (
+                    <span className="truncate text-[10px] text-mab-texte sm:text-[11px]" title={absentOn(iso).map((a) => byId.get(a.user_id)?.full_name).join(', ')}>
+                      🌴 {absentOn(iso).map((a) => byId.get(a.user_id)?.full_name.split(' ')[0]).join(', ')}
+                    </span>
+                  )}
                   {de.slice(0, 2).map((e) => (
                     <span key={e.id} className="truncate rounded-mab-puce bg-mab-violet-wash px-1 text-[10px] font-medium text-mab-violet-texte sm:text-[11px]">{e.time} {e.title}</span>
                   ))}
@@ -101,6 +110,7 @@ export default function Agenda() {
             ))}
             <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-mab-gris-doux" />Tâches rapides</span>
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-mab-puce bg-mab-violet-wash" />Événements</span>
+            <span className="flex items-center gap-1.5">🌴 Absences</span>
           </div>
         </Card>
 
@@ -110,6 +120,19 @@ export default function Agenda() {
             <Button variant="discret" onClick={() => setEventDraft({ date: day })}>+ Événement</Button>
             <Button variant="discret" onClick={() => setTaskDraft({ due_date: day })}>+ Tâche rapide</Button>
           </div>
+          {absentOn(day).length > 0 && (
+            <>
+              <h3 className="mb-1 mt-4 text-xs font-semibold uppercase tracking-[.12em] text-mab-aqua-texte">Absents · {absentOn(day).length}</h3>
+              {absentOn(day).map((a) => (
+                <div key={a.id} className="flex items-center gap-2.5 py-1.5 text-sm">
+                  <Avatar p={byId.get(a.user_id)} size={24} />
+                  <span className="flex-1">{byId.get(a.user_id)?.full_name}</span>
+                  <span className="text-xs" style={{ color: KIND_COLOR[absenceKind(a, me)] === '#3bbfbf' ? '#1f7f7f' : KIND_COLOR[absenceKind(a, me)] }}>{absenceKind(a, me)}{a.status === 'en_attente' && ' (demandée)'}</span>
+                </div>
+              ))}
+              <p className="text-xs text-mab-gris-doux">{absentOn(day).map((a) => `${byId.get(a.user_id)?.full_name.split(' ')[0]} ${absenceRange(a)}`).join(' · ')}</p>
+            </>
+          )}
           <h3 className="mb-1 mt-4 text-xs font-semibold uppercase tracking-[.12em] text-mab-aqua-texte">Événements · {dayEvents.length}</h3>
           {dayEvents.length === 0 && <p className="py-2 text-sm text-mab-gris-doux">Aucun.</p>}
           {dayEvents.map((e) => (

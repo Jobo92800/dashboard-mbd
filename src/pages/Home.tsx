@@ -13,9 +13,11 @@ import { AvailabilityPicker } from '../components/AvailabilityPicker';
 import { Avatar, AvailDot, Badge, Button, Card, Empty, PageTitle, Progress, Stat, Surtitre } from '../components/ui';
 import { fmtDur } from '../components/EventModal';
 import { conversationName } from '../lib/conversations';
+import { AnnouncementCard } from './Announcements';
+import { absenceKind, absenceOn } from '../lib/absences';
 
 export default function Home() {
-  const { me, snap, byId, unreadByConv } = useStore();
+  const { me, snap, byId, unreadByConv, unreadAnnouncements } = useStore();
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const today = todayIso();
   const in7 = toIso(addDays(new Date(), 7));
@@ -50,6 +52,17 @@ export default function Home() {
       <PageTitle title={<>{hello} {me!.full_name.split(' ')[0]}, <b>voici ta journée</b></>} sub={fmtLong(today).replace(/^./, (c) => c.toUpperCase())}>
         <Button variant="primaire" onClick={() => setDraft({})}><Plus size={17} /> Nouvelle tâche</Button>
       </PageTitle>
+
+      {unreadAnnouncements.filter((a) => a.important).map((a) => (
+        <div key={a.id} className="mb-6"><AnnouncementCard a={a} compact /></div>
+      ))}
+      {unreadAnnouncements.some((a) => !a.important) && (
+        <Link to="/annonces" className="mb-6 flex items-center gap-3 rounded-mab-carte border border-mab-filet-aqua bg-white px-5 py-3 text-sm hover:bg-mab-wash">
+          <span className="text-lg">📣</span>
+          <span className="flex-1"><b>{unreadAnnouncements.filter((a) => !a.important).length} annonce{unreadAnnouncements.filter((a) => !a.important).length > 1 ? 's' : ''} à lire</b> · {unreadAnnouncements.filter((a) => !a.important)[0].title}</span>
+          <span className="text-mab-aqua-texte">Lire →</span>
+        </Link>
+      )}
 
       <Card className="mb-6 px-5 py-4">
         <Surtitre className="mb-2.5">Mon statut pour l’équipe</Surtitre>
@@ -137,15 +150,18 @@ export default function Home() {
           <Card className="p-5">
             <h2 className="mb-3 text-lg font-semibold">L’équipe maintenant</h2>
             <div className="grid gap-2.5">
-              {snap.profiles.filter((p) => p.active && p.id !== me!.id).map((p) => (
-                <div key={p.id} className="flex items-center gap-3">
-                  <span className="relative"><Avatar p={p} size={32} /><AvailDot a={p.availability} className="absolute -bottom-0.5 -right-0.5" /></span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{p.full_name}</p>
-                    <p className="truncate text-xs text-mab-texte">{p.availability_note || '—'}</p>
+              {snap.profiles.filter((p) => p.active && p.id !== me!.id).map((p) => {
+                const away = absenceOn(snap.absences.filter((a) => a.status === 'validee'), p.id, today);
+                return (
+                  <div key={p.id} className={`flex items-center gap-3 ${away ? 'opacity-60' : ''}`}>
+                    <span className="relative"><Avatar p={p} size={32} /><AvailDot a={away ? 'absent' : p.availability} className="absolute -bottom-0.5 -right-0.5" /></span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{p.full_name}</p>
+                      <p className="truncate text-xs text-mab-texte">{away ? `🌴 ${absenceKind(away, me)} jusqu’au ${away.end_date.split('-').reverse().slice(0, 2).join('/')}` : p.availability_note || '—'}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         </div>

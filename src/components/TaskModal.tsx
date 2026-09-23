@@ -8,6 +8,7 @@ import { fmtStamp } from '../lib/dates';
 import { Button, Field, Input, Modal, Select, Textarea } from './ui';
 import { Attachments, ChecklistEditor } from './TaskExtras';
 import { Discussion } from './Comments';
+import { absenceWarning } from '../lib/absences';
 
 export type TaskDraft = Partial<Task>;
 
@@ -128,6 +129,10 @@ export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose
               </Select>
             </Field>
           </div>
+          {(() => {
+            const w = absenceWarning(snap.absences, byId.get(t.assignee_id ?? ''), t.due_date, me);
+            return w && t.status !== 'fait' ? <p className="rounded-mab-champ bg-mab-rose-wash px-4 py-2.5 text-sm text-mab-rose-texte">🌴 {w} Choisis une autre date ou une autre personne ?</p> : null;
+          })()}
           <Field label="Description">
             <Textarea value={t.note ?? ''} onChange={(e) => set({ note: e.target.value })} placeholder="Contexte, consignes, numéro à rappeler…" />
           </Field>

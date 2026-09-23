@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { backend } from '../data';
 import { uid } from '../data/backend';
 import type { NewMember } from '../data/backend';
-import type { Attachment, CalEvent, ChecklistItem, Conversation, Message, Profile, Project, ProjectTemplate, Snapshot, Task, TaskStatus } from '../lib/types';
+import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, ChecklistItem, Conversation, Doc, Message, Profile, Project, ProjectTemplate, Snapshot, Task, TaskStatus } from '../lib/types';
 import { nextOccurrence, shiftIso } from '../lib/recurrence';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useToast } from './toast';
@@ -11,6 +11,7 @@ import { nextColor as nextColorFor } from '../lib/palette';
 const EMPTY: Snapshot = {
   profiles: [], projects: [], tasks: [], comments: [], events: [], notifications: [], activity: [],
   conversations: [], messages: [], reads: [], task_comments: [], templates: [],
+  reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [],
 };
 const now = () => new Date().toISOString();
 
@@ -94,6 +95,17 @@ function useStoreValue() {
       checklist: t.checklist.map((c) => ({ ...c, done: false })),
     };
     await backend.insert('tasks', next);
+  };
+
+  /** Fichier déposé ou lien saisi → pièce jointe prête à enregistrer. */
+  const makeAttachment = async (input: { file?: File; name?: string; url?: string }, folder: string, bucket: Bucket): Promise<Attachment> => {
+    if (input.file) {
+      const { path, url } = await backend.uploadFile(input.file, folder, bucket);
+      return { id: uid(), name: input.file.name, url, path: path || undefined, kind: 'fichier', size: input.file.size, bucket };
+    }
+    let url = (input.url ?? '').trim();
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    return { id: uid(), name: (input.name ?? '').trim() || url.replace(/^https?:\/\//, '').slice(0, 60), url, kind: 'lien' };
   };
 
   const mentionedIn = (body: string) =>
@@ -251,15 +263,7 @@ function useStoreValue() {
     },
 
     async addAttachment(t: Task, input: { file?: File; name?: string; url?: string }) {
-      let att: Attachment;
-      if (input.file) {
-        const { path, url } = await backend.uploadFile(input.file, t.id);
-        att = { id: uid(), name: input.file.name, url, path: path || undefined, kind: 'fichier', size: input.file.size };
-      } else {
-        let url = (input.url ?? '').trim();
-        if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-        att = { id: uid(), name: (input.name ?? '').trim() || url.replace(/^https?:\/\//, '').slice(0, 60), url, kind: 'lien' };
-      }
+      const att = await makeAttachment(input, t.id, 'pieces-jointes');
       const current = snap.tasks.find((x) => x.id === t.id) ?? t;
       await actions.patchTask(current, { attachments: [...current.attachments, att] });
     },
@@ -268,7 +272,7 @@ function useStoreValue() {
       return actions.patchTask(t, { attachments: t.attachments.filter((a) => a.id !== id) });
     },
 
-    openAttachment: (a: Attachment) => (a.path ? backend.fileUrl(a.path, a.url) : Promise.resolve(a.url)),
+    openAttachment: (a: Attachment) => (a.path ? backend.fileUrl(a.path, a.url, a.bucket ?? 'pieces-jointes') : Promise.resolve(a.url)),
 
     addTaskComment(t: Task, body: string) {
       const row = { id: uid(), task_id: t.id, author_id: me!.id, body, created_at: now() };
@@ -396,7 +400,7 @@ function useStoreValue() {
         ? snap.conversations.find((c) => !c.title && c.member_ids.length === 2 && members.every((m) => c.member_ids.includes(m)))
         : undefined;
       const conv: Conversation = existing ?? {
-        id: uid(), title: cleanTitle, member_ids: members, created_by: me!.id, created_at: now(), last_message_at: now(),
+        id: uid(), title: cleanTitle, member_ids: members, created_by: me!.id, created_at: now(), last_message_at: now(), pinned_ids: [],
       };
       if (!existing) {
         await run((st) => ({ ...st, conversations: [conv, ...st.conversations] }), () => backend.insert('conversations', conv));
@@ -405,9 +409,14 @@ function useStoreValue() {
       return conv.id;
     },
 
-    sendMessage(conv: Conversation, body: string) {
+    async sendMessage(conv: Conversation, body: string, opts: { replyTo?: string | null; files?: File[] } = {}) {
       const at = now();
-      const msg: Message = { id: uid(), conversation_id: conv.id, author_id: me!.id, body: body.trim(), created_at: at };
+      const attachments: Attachment[] = [];
+      for (const f of opts.files ?? []) attachments.push(await makeAttachment({ file: f }, conv.id, 'messagerie'));
+      const msg: Message = {
+        id: uid(), conversation_id: conv.id, author_id: me!.id, body: body.trim(), created_at: at,
+        reply_to: opts.replyTo ?? null, attachments, edited_at: null,
+      };
       const mark = { id: `${conv.id}:${me!.id}`, conversation_id: conv.id, user_id: me!.id, read_at: at };
       return run(
         (st) => ({
@@ -422,6 +431,135 @@ function useStoreValue() {
           await backend.upsert('reads', mark);
         },
       );
+    },
+
+    editMessage(m: Message, body: string) {
+      const patch = { body: body.trim(), edited_at: now() };
+      return run((st) => ({ ...st, messages: st.messages.map((x) => (x.id === m.id ? { ...x, ...patch } : x)) }), () => backend.update('messages', m.id, patch));
+    },
+
+    toggleReaction(m: Message, emoji: string) {
+      const id = `${m.id}:${me!.id}:${emoji}`;
+      const mine = snap.reactions.some((r) => r.id === id);
+      const row = { id, message_id: m.id, user_id: me!.id, emoji };
+      return run(
+        (st) => ({ ...st, reactions: mine ? st.reactions.filter((r) => r.id !== id) : [...st.reactions, row] }),
+        () => (mine ? backend.remove('reactions', id) : backend.insert('reactions', row)),
+      );
+    },
+
+    togglePin(conv: Conversation, messageId: string) {
+      const pinned_ids = conv.pinned_ids.includes(messageId) ? conv.pinned_ids.filter((x) => x !== messageId) : [...conv.pinned_ids, messageId];
+      return actions.updateConversation(conv, { pinned_ids }, conv.pinned_ids.includes(messageId) ? 'Message désépinglé' : 'Message épinglé');
+    },
+
+    // ---------- Annonces ----------
+    saveAnnouncement(a: Partial<Announcement> & { title: string; body: string }) {
+      const existing = a.id ? snap.announcements.find((x) => x.id === a.id) : undefined;
+      if (existing) {
+        const patch = { title: a.title, body: a.body, important: !!a.important, updated_at: now() };
+        return run((st) => ({ ...st, announcements: st.announcements.map((x) => (x.id === a.id ? { ...x, ...patch } : x)) }), () => backend.update('announcements', existing.id, patch), 'Annonce mise à jour');
+      }
+      const row: Announcement = { id: uid(), title: a.title, body: a.body, important: !!a.important, author_id: me!.id, created_at: now(), updated_at: null };
+      const read = { id: `${row.id}:${me!.id}`, announcement_id: row.id, user_id: me!.id, read_at: now() };
+      return run(
+        (st) => ({ ...st, announcements: [row, ...st.announcements], announcement_reads: [...st.announcement_reads, read] }),
+        async () => {
+          await backend.insert('announcements', row);
+          await backend.upsert('announcement_reads', read);
+          await notify(snap.profiles.filter((p) => p.active).map((p) => p.id), `${row.important ? '📣 Important · ' : '📣 '}${row.title}`, '/annonces');
+        },
+        'Annonce publiée',
+      );
+    },
+
+    deleteAnnouncement(id: string) {
+      return run((st) => ({ ...st, announcements: st.announcements.filter((a) => a.id !== id) }), () => backend.remove('announcements', id), 'Annonce supprimée');
+    },
+
+    markAnnouncementRead(a: Announcement) {
+      const row = { id: `${a.id}:${me!.id}`, announcement_id: a.id, user_id: me!.id, read_at: now() };
+      return run((st) => ({ ...st, announcement_reads: [...st.announcement_reads.filter((r) => r.id !== row.id), row] }), () => backend.upsert('announcement_reads', row));
+    },
+
+    remindAnnouncement(a: Announcement) {
+      const readers = new Set(snap.announcement_reads.filter((r) => r.announcement_id === a.id).map((r) => r.user_id));
+      const missing = snap.profiles.filter((p) => p.active && !readers.has(p.id)).map((p) => p.id);
+      return run((st) => st, () => notify(missing, `⏰ À lire : « ${a.title} »`, '/annonces'), `Relance envoyée à ${missing.length} personne${missing.length > 1 ? 's' : ''}`);
+    },
+
+    // ---------- Documents ----------
+    async saveDoc(d: Partial<Doc> & { title: string }) {
+      const existing = d.id ? snap.docs.find((x) => x.id === d.id) : undefined;
+      if (existing) {
+        const patch = { ...d, updated_by: me!.id, updated_at: now() };
+        await run((st) => ({ ...st, docs: st.docs.map((x) => (x.id === d.id ? { ...x, ...patch } : x)) }), () => backend.update('docs', existing.id, patch), 'Document enregistré');
+        return existing.id;
+      }
+      const row: Doc = {
+        id: uid(), category: 'Autre', content: '', attachments: [], admins_only: false, pinned: false,
+        author_id: me!.id, updated_by: me!.id, created_at: now(), updated_at: now(), ...d,
+      } as Doc;
+      await run((st) => ({ ...st, docs: [row, ...st.docs] }), () => backend.insert('docs', row), 'Document créé');
+      return row.id;
+    },
+
+    deleteDoc(id: string) {
+      return run((st) => ({ ...st, docs: st.docs.filter((d) => d.id !== id) }), () => backend.remove('docs', id), 'Document supprimé');
+    },
+
+    async addDocAttachment(d: Doc, input: { file?: File; name?: string; url?: string }) {
+      const att = await makeAttachment(input, d.id, 'documents');
+      const current = snap.docs.find((x) => x.id === d.id) ?? d;
+      const patch = { attachments: [...current.attachments, att], updated_by: me!.id, updated_at: now() };
+      await run((st) => ({ ...st, docs: st.docs.map((x) => (x.id === d.id ? { ...x, ...patch } : x)) }), () => backend.update('docs', d.id, patch));
+    },
+
+    removeDocAttachment(d: Doc, attId: string) {
+      const patch = { attachments: d.attachments.filter((a) => a.id !== attId) };
+      return run((st) => ({ ...st, docs: st.docs.map((x) => (x.id === d.id ? { ...x, ...patch } : x)) }), () => backend.update('docs', d.id, patch));
+    },
+
+    // ---------- Absences ----------
+    saveAbsence(a: Partial<Absence> & { user_id: string; start_date: string; end_date: string; kind: string }) {
+      const admin = me!.role === 'admin';
+      const existing = a.id ? snap.absences.find((x) => x.id === a.id) : undefined;
+      const dm = (iso: string) => iso.split('-').reverse().slice(0, 2).join('/');
+      const range = a.start_date === a.end_date ? `le ${dm(a.start_date)}` : `du ${dm(a.start_date)} au ${dm(a.end_date)}`;
+      if (existing) {
+        const patch = { ...a, status: admin ? a.status ?? existing.status : 'en_attente' as AbsenceStatus };
+        return run((st) => ({ ...st, absences: st.absences.map((x) => (x.id === a.id ? { ...x, ...patch } : x)) }), () => backend.update('absences', existing.id, patch), 'Absence mise à jour');
+      }
+      const row: Absence = { id: uid(), note: '', created_by: me!.id, created_at: now(), ...a, status: admin ? 'validee' : 'en_attente' } as Absence;
+      const who = snap.profiles.find((p) => p.id === row.user_id)?.full_name.split(' ')[0] ?? '';
+      return run(
+        (st) => ({ ...st, absences: [row, ...st.absences] }),
+        async () => {
+          await backend.insert('absences', row);
+          if (!admin) {
+            const admins = snap.profiles.filter((p) => p.active && p.role === 'admin').map((p) => p.id);
+            await notify(admins, `🌴 ${who} demande une absence (${row.kind.toLowerCase()}) ${range}`, '/absences');
+          } else if (row.user_id !== me!.id) {
+            await notify([row.user_id], `🌴 ${firstName(me!.id)} a noté ton absence (${row.kind.toLowerCase()}) ${range}`, '/absences');
+          }
+        },
+        admin ? 'Absence enregistrée' : 'Demande envoyée aux administrateurs',
+      );
+    },
+
+    decideAbsence(a: Absence, status: AbsenceStatus) {
+      return run(
+        (st) => ({ ...st, absences: st.absences.map((x) => (x.id === a.id ? { ...x, status } : x)) }),
+        async () => {
+          await backend.update('absences', a.id, { status });
+          await notify([a.user_id], `🌴 Ta demande d’absence du ${a.start_date.split('-').reverse().slice(0, 2).join('/')} a été ${status === 'validee' ? 'validée ✅' : 'refusée'}`, '/absences');
+        },
+        status === 'validee' ? 'Absence validée' : 'Absence refusée',
+      );
+    },
+
+    deleteAbsence(id: string) {
+      return run((st) => ({ ...st, absences: st.absences.filter((a) => a.id !== id) }), () => backend.remove('absences', id), 'Absence supprimée');
     },
 
     markConversationRead(convId: string) {
@@ -473,7 +611,13 @@ function useStoreValue() {
   }, [snap.messages, snap.reads, me]);
   const unreadMessages = [...unreadByConv.values()].reduce((a, b) => a + b, 0);
 
-  return { me, booting, loaded, snap, byId, unreadByConv, unreadMessages, recovery, setRecovery, mode: backend.mode, reload, ...actions };
+  const unreadAnnouncements = useMemo(() => {
+    if (!me) return [];
+    const read = new Set(snap.announcement_reads.filter((r) => r.user_id === me.id).map((r) => r.announcement_id));
+    return snap.announcements.filter((x) => !read.has(x.id));
+  }, [snap.announcements, snap.announcement_reads, me]);
+
+  return { me, booting, loaded, snap, byId, unreadByConv, unreadMessages, unreadAnnouncements, recovery, setRecovery, mode: backend.mode, reload, ...actions };
 }
 
 function escapeRe(s: string) {

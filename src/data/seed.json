@@ -1462,7 +1462,8 @@
    ],
    "created_by": "u-nico",
    "created_at": "2026-09-23T07:30:00.000Z",
-   "last_message_at": "2026-09-23T08:12:00.000Z"
+   "last_message_at": "2026-09-23T08:12:00.000Z",
+   "pinned_ids": []
   },
   {
    "id": "conv-webinaire",
@@ -1475,7 +1476,10 @@
    ],
    "created_by": "u-elisa",
    "created_at": "2026-09-23T07:00:00.000Z",
-   "last_message_at": "2026-09-23T09:05:00.000Z"
+   "last_message_at": "2026-09-23T09:05:00.000Z",
+   "pinned_ids": [
+    "m3"
+   ]
   }
  ],
  "messages": [
@@ -1484,35 +1488,50 @@
    "conversation_id": "conv-jo-nico",
    "author_id": "u-nico",
    "body": "Tu peux me faire un point sur le tracking Meta avant midi ?",
-   "created_at": "2026-09-23T08:10:00.000Z"
+   "created_at": "2026-09-23T08:10:00.000Z",
+   "reply_to": null,
+   "attachments": [],
+   "edited_at": null
   },
   {
    "id": "m2",
    "conversation_id": "conv-jo-nico",
    "author_id": "u-jo",
    "body": "Oui, je vérifie les événements de conversion et je te redis.",
-   "created_at": "2026-09-23T08:12:00.000Z"
+   "created_at": "2026-09-23T08:12:00.000Z",
+   "reply_to": null,
+   "attachments": [],
+   "edited_at": null
   },
   {
    "id": "m3",
    "conversation_id": "conv-webinaire",
    "author_id": "u-elisa",
    "body": "J’ai créé ce groupe pour caler le runbook du live. Répétition générale le 7/10 à 14 h, ça va pour tout le monde ?",
-   "created_at": "2026-09-23T08:50:00.000Z"
+   "created_at": "2026-09-23T08:50:00.000Z",
+   "reply_to": null,
+   "attachments": [],
+   "edited_at": null
   },
   {
    "id": "m4",
    "conversation_id": "conv-webinaire",
    "author_id": "u-leslie",
    "body": "Ok pour moi 👍",
-   "created_at": "2026-09-23T09:01:00.000Z"
+   "created_at": "2026-09-23T09:01:00.000Z",
+   "reply_to": null,
+   "attachments": [],
+   "edited_at": null
   },
   {
    "id": "m5",
    "conversation_id": "conv-webinaire",
    "author_id": "u-nico",
    "body": "Parfait. Jo, tu prévois le test salle + micro juste avant ?",
-   "created_at": "2026-09-23T09:05:00.000Z"
+   "created_at": "2026-09-23T09:05:00.000Z",
+   "reply_to": "m3",
+   "attachments": [],
+   "edited_at": null
   }
  ],
  "reads": [],
@@ -1878,6 +1897,180 @@
    ],
    "created_by": "u-nico",
    "created_at": "2026-09-23T09:00:00.000Z"
+  }
+ ],
+ "reactions": [
+  {
+   "id": "m4:u-nico:👍",
+   "message_id": "m4",
+   "user_id": "u-nico",
+   "emoji": "👍"
+  },
+  {
+   "id": "m3:u-jo:✅",
+   "message_id": "m3",
+   "user_id": "u-jo",
+   "emoji": "✅"
+  },
+  {
+   "id": "m3:u-leslie:✅",
+   "message_id": "m3",
+   "user_id": "u-leslie",
+   "emoji": "✅"
+  }
+ ],
+ "announcements": [
+  {
+   "id": "an-1",
+   "title": "Webinaire du 9 octobre : répétition générale obligatoire",
+   "body": "Bonjour à tous,\n\nLa **répétition générale** du webinaire a lieu le **mercredi 7 octobre à 14 h** en visio. Toute l’équipe doit être présente : on déroule le runbook minute par minute.\n\n- Tester son micro et sa caméra avant\n- Relire son rôle dans le runbook (voir Documents → Runbook webinaire)\n- Prévoir 1 h 30\n\nMerci !",
+   "important": true,
+   "author_id": "u-nico",
+   "created_at": "2026-09-23T08:00:00.000Z",
+   "updated_at": null
+  },
+  {
+   "id": "an-2",
+   "title": "Nouveaux horaires du centre du Crès",
+   "body": "À partir du lundi 5 octobre, le centre du Crès ouvre **de 9 h à 19 h** du lundi au vendredi, et de 9 h à 13 h le samedi. Pensez-y pour vos prises de rendez-vous.",
+   "important": false,
+   "author_id": "u-jo",
+   "created_at": "2026-09-22T16:30:00.000Z",
+   "updated_at": null
+  }
+ ],
+ "announcement_reads": [
+  {
+   "id": "an-1:u-nico",
+   "announcement_id": "an-1",
+   "user_id": "u-nico",
+   "read_at": "2026-09-23T08:00:00.000Z"
+  },
+  {
+   "id": "an-1:u-elisa",
+   "announcement_id": "an-1",
+   "user_id": "u-elisa",
+   "read_at": "2026-09-23T09:10:00.000Z"
+  },
+  {
+   "id": "an-2:u-jo",
+   "announcement_id": "an-2",
+   "user_id": "u-jo",
+   "read_at": "2026-09-22T16:30:00.000Z"
+  },
+  {
+   "id": "an-2:u-nico",
+   "announcement_id": "an-2",
+   "user_id": "u-nico",
+   "read_at": "2026-09-22T17:00:00.000Z"
+  },
+  {
+   "id": "an-2:u-marie",
+   "announcement_id": "an-2",
+   "user_id": "u-marie",
+   "read_at": "2026-09-22T18:00:00.000Z"
+  },
+  {
+   "id": "an-2:u-flora",
+   "announcement_id": "an-2",
+   "user_id": "u-flora",
+   "read_at": "2026-09-23T07:00:00.000Z"
+  }
+ ],
+ "docs": [
+  {
+   "id": "doc-rf",
+   "title": "Protocole anti-âge radiofréquence",
+   "category": "Protocoles",
+   "content": "# Déroulé d’une séance (45 min)\n1. Accueil et questionnaire de suivi\n2. Démaquillage et préparation de la peau\n3. Application du gel conducteur\n4. Passage de la sonde : front, joues, ovale, cou\n5. Masque apaisant (10 min)\n6. Conseils et prise du prochain rendez-vous\n\n## Contre-indications\n- Grossesse et allaitement\n- Pacemaker ou implant électronique\n- Prothèses métalliques dans la zone traitée\n- Peau lésée, rosacée en poussée\n\n> En cas de doute : ne pas faire la séance et demander l’avis de **Flora**.\n\n## Fréquence conseillée\nUne séance par semaine pendant 6 semaines, puis entretien mensuel.",
+   "attachments": [],
+   "admins_only": false,
+   "pinned": true,
+   "author_id": "u-elisa",
+   "updated_by": "u-flora",
+   "created_at": "2026-09-20T10:00:00.000Z",
+   "updated_at": "2026-09-23T10:04:00.000Z"
+  },
+  {
+   "id": "doc-script",
+   "title": "Script d’appel découverte BioPortrait",
+   "category": "Commercial",
+   "content": "## Ouverture\n« Bonjour, c’est Marie de MAbeautyplus. Vous avez rempli votre BioPortrait, je vous appelle pour vous en donner les premiers enseignements. Vous avez 5 minutes ? »\n\n## Questions clés\n- Qu’est-ce qui vous a donné envie de faire le BioPortrait ?\n- Qu’avez-vous déjà essayé ?\n- Qu’est-ce qui changerait pour vous si vous y arriviez ?\n\n## Proposer le rendez-vous\nProposer **deux créneaux précis** dans le centre le plus proche.\n\n## Checklist après l’appel\n- [ ] Statut mis à jour dans Airtable\n- [ ] Rendez-vous créé\n- [ ] SMS de confirmation envoyé",
+   "attachments": [],
+   "admins_only": false,
+   "pinned": false,
+   "author_id": "u-marie",
+   "updated_by": "u-marie",
+   "created_at": "2026-09-18T09:00:00.000Z",
+   "updated_at": "2026-09-21T15:20:00.000Z"
+  },
+  {
+   "id": "doc-runbook",
+   "title": "Runbook webinaire",
+   "category": "Webinaires",
+   "content": "# Rôles\n- **Nico** : animation principale\n- **Flora** : intervention micronutrition\n- **Jo** : technique et surveillance du live\n- **Leslie** : modération du chat\n- **Marie** : repérage des prospects chauds\n- **Elisa** : chrono et coordination\n\n# Minute par minute\n- H-60 : ouverture de la salle, tests son et image\n- H-15 : message de rappel\n- H : lancement\n- H+45 : questions / réponses\n- H+60 : fin, envoi du lien de rendez-vous",
+   "attachments": [],
+   "admins_only": false,
+   "pinned": false,
+   "author_id": "u-elisa",
+   "updated_by": "u-elisa",
+   "created_at": "2026-09-23T13:05:00.000Z",
+   "updated_at": "2026-09-23T13:05:00.000Z"
+  },
+  {
+   "id": "doc-outils",
+   "title": "Outils de l’équipe et qui contacter",
+   "category": "Outils & accès",
+   "content": "- **Airtable** (Prospects Master) : suivi des leads, demander à **Jo**\n- **Brevo** : e-mails et SMS, demander à **Leslie**\n- **Meta Business** : publicités, demander à **Nico**\n- **Canva** : visuels, demander à **Leslie**\n\n> Aucun mot de passe dans ce document.",
+   "attachments": [
+    {
+     "id": "att-airtable",
+     "name": "Airtable",
+     "url": "https://airtable.com",
+     "kind": "lien"
+    }
+   ],
+   "admins_only": true,
+   "pinned": false,
+   "author_id": "u-jo",
+   "updated_by": "u-jo",
+   "created_at": "2026-09-19T11:00:00.000Z",
+   "updated_at": "2026-09-19T11:00:00.000Z"
+  }
+ ],
+ "absences": [
+  {
+   "id": "abs-1",
+   "user_id": "u-flora",
+   "start_date": "2026-09-28",
+   "end_date": "2026-10-02",
+   "kind": "Congés",
+   "note": "",
+   "status": "validee",
+   "created_by": "u-flora",
+   "created_at": "2026-09-10T09:00:00.000Z"
+  },
+  {
+   "id": "abs-2",
+   "user_id": "u-leslie",
+   "start_date": "2026-10-06",
+   "end_date": "2026-10-06",
+   "kind": "Formation",
+   "note": "Formation Brevo avancée",
+   "status": "validee",
+   "created_by": "u-nico",
+   "created_at": "2026-09-15T09:00:00.000Z"
+  },
+  {
+   "id": "abs-3",
+   "user_id": "u-marie",
+   "start_date": "2026-10-19",
+   "end_date": "2026-10-23",
+   "kind": "Congés",
+   "note": "Vacances de la Toussaint",
+   "status": "en_attente",
+   "created_by": "u-marie",
+   "created_at": "2026-09-23T10:00:00.000Z"
   }
  ]
 }

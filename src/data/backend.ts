@@ -1,4 +1,4 @@
-import type { Profile, Role, Snapshot, Table } from '../lib/types';
+import type { Bucket, Profile, Role, Snapshot, Table } from '../lib/types';
 
 export interface NewMember {
   email: string;
@@ -22,9 +22,9 @@ export interface Backend {
   remove(table: Table, id: string): Promise<void>;
   insertMany<T extends Table>(table: T, rows: Snapshot[T][number][]): Promise<void>;
   /** Dépose un fichier joint et renvoie son emplacement. */
-  uploadFile(file: File, folder: string): Promise<{ path: string; url: string }>;
+  uploadFile(file: File, folder: string, bucket?: Bucket): Promise<{ path: string; url: string }>;
   /** Adresse temporaire pour ouvrir un fichier joint. */
-  fileUrl(path: string, fallback: string): Promise<string>;
+  fileUrl(path: string, fallback: string, bucket?: Bucket): Promise<string>;
   /** Crée ou remplace la ligne portant cet id. */
   upsert<T extends Table>(table: T, row: Snapshot[T][number]): Promise<void>;
   /** Jeton de session, pour appeler les fonctions serveur. */

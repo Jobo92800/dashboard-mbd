@@ -39,6 +39,8 @@ export function visibleFor(me: Profile, s: Snapshot): Snapshot {
     conversations: convs,
     messages: s.messages.filter((m) => convIds.has(m.conversation_id)),
     reads: s.reads.filter((r) => r.user_id === me.id),
+    reactions: s.reactions.filter((r) => s.messages.some((m) => m.id === r.message_id && convIds.has(m.conversation_id))),
+    docs: isAdmin(me) ? s.docs : s.docs.filter((d) => !d.admins_only),
   };
   if (isAdmin(me)) return { ...s, ...privateParts };
   const visibleTasks = s.tasks.filter((t) => canSeeTask(me, t, s.projects.filter((p) => p.member_ids.includes(me.id))));
@@ -51,6 +53,9 @@ export function visibleFor(me: Profile, s: Snapshot): Snapshot {
     tasks: visibleTasks,
     task_comments: s.task_comments.filter((c) => taskIds.has(c.task_id)),
     templates: s.templates,
+    announcements: s.announcements,
+    announcement_reads: s.announcement_reads,
+    absences: s.absences,
     comments: s.comments.filter((c) => ids.has(c.project_id)),
     events: s.events.filter((e) => canSeeEvent(me, e)),
     ...privateParts,

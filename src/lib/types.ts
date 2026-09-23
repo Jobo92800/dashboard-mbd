@@ -48,7 +48,8 @@ export const RECURRENCES: { id: Recurrence; label: string }[] = [
 export interface ChecklistItem { id: string; text: string; done: boolean }
 
 /** Lien (Canva, Drive…) ou fichier déposé. `path` = emplacement dans le stockage pour un fichier. */
-export interface Attachment { id: string; name: string; url: string; kind: 'lien' | 'fichier'; path?: string; size?: number }
+export type Bucket = 'pieces-jointes' | 'messagerie' | 'documents';
+export interface Attachment { id: string; name: string; url: string; kind: 'lien' | 'fichier'; path?: string; size?: number; bucket?: Bucket }
 
 /** Une tâche sans project_id est une « tâche rapide » (hors projet). */
 export interface Task {
@@ -149,6 +150,7 @@ export interface Conversation {
   created_by: string | null;
   created_at: string;
   last_message_at: string;
+  pinned_ids: string[]; // messages épinglés
 }
 
 export interface Message {
@@ -156,6 +158,67 @@ export interface Message {
   conversation_id: string;
   author_id: string;
   body: string;
+  created_at: string;
+  reply_to: string | null; // message auquel on répond
+  attachments: Attachment[];
+  edited_at: string | null;
+}
+
+/** Une réaction = une personne + un emoji sur un message (id = message:personne:emoji). */
+export interface Reaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+}
+
+/** Annonce publiée par un admin à toute l'équipe, avec accusé de lecture. */
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  important: boolean;
+  author_id: string;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface AnnouncementRead {
+  id: string; // annonce:personne
+  announcement_id: string;
+  user_id: string;
+  read_at: string;
+}
+
+export const DOC_CATEGORIES = ['Protocoles', 'Commercial', 'Webinaires', 'Outils & accès', 'Organisation', 'Autre'] as const;
+
+/** Page de la base documentaire (procédures, scripts, runbooks…). */
+export interface Doc {
+  id: string;
+  title: string;
+  category: string;
+  content: string; // texte mis en forme simple (titres #, listes -, **gras**, liens)
+  attachments: Attachment[];
+  admins_only: boolean;
+  pinned: boolean;
+  author_id: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const ABSENCE_KINDS = ['Congés', 'Formation', 'Déplacement', 'Maladie', 'Autre'] as const;
+export type AbsenceStatus = 'en_attente' | 'validee' | 'refusee';
+
+export interface Absence {
+  id: string;
+  user_id: string;
+  start_date: string;
+  end_date: string;
+  kind: string;
+  note: string;
+  status: AbsenceStatus;
+  created_by: string | null;
   created_at: string;
 }
 
@@ -180,6 +243,11 @@ export interface Snapshot {
   reads: ReadMark[];
   task_comments: TaskComment[];
   templates: ProjectTemplate[];
+  reactions: Reaction[];
+  announcements: Announcement[];
+  announcement_reads: AnnouncementRead[];
+  docs: Doc[];
+  absences: Absence[];
 }
 
 export type Table = keyof Snapshot;

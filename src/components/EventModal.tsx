@@ -5,13 +5,14 @@ import { EVENT_TYPES } from '../lib/types';
 import { useStore } from '../state/store';
 import { canEditEvent } from '../lib/permissions';
 import { todayIso } from '../lib/dates';
+import { absenceWarning } from '../lib/absences';
 import { Button, Field, Input, Modal, PeoplePicker, Select, Textarea } from './ui';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240];
 const fmtDur = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60}` : ''}`);
 
 export function EventModal({ draft, onClose }: { draft: Partial<CalEvent> | null; onClose: () => void }) {
-  const { snap, me, saveEvent, deleteEvent } = useStore();
+  const { snap, me, byId, saveEvent, deleteEvent } = useStore();
   const [e, setE] = useState<Partial<CalEvent>>({});
   useEffect(() => {
     if (draft) setE({ kind: 'Réunion', date: todayIso(), time: '09:00', duration_min: 30, participant_ids: me ? [me.id] : [], ...draft });
@@ -65,6 +66,9 @@ export function EventModal({ draft, onClose }: { draft: Partial<CalEvent> | null
         <Field label="Participants" help="Chaque participant est prévenu dans ses notifications.">
           <PeoplePicker people={snap.profiles.filter((p) => p.active)} value={e.participant_ids ?? []} onChange={(ids) => set({ participant_ids: ids })} />
         </Field>
+        {(e.participant_ids ?? []).map((id) => absenceWarning(snap.absences, byId.get(id), e.date, me)).filter(Boolean).map((w) => (
+          <p key={w} className="rounded-mab-champ bg-mab-rose-wash px-4 py-2 text-sm text-mab-rose-texte">🌴 {w}</p>
+        ))}
         <Field label="Note / objectif">
           <Textarea value={e.note ?? ''} onChange={(x) => set({ note: x.target.value })} />
         </Field>

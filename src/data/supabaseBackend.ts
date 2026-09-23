@@ -12,8 +12,8 @@ function clean<T extends object>(row: T): T {
 const TABLES: Table[] = [
   'profiles', 'projects', 'tasks', 'comments', 'events', 'notifications', 'activity',
   'conversations', 'messages', 'reads', 'task_comments', 'templates',
+  'reactions', 'announcements', 'announcement_reads', 'docs', 'absences',
 ];
-const BUCKET = 'pieces-jointes';
 
 export function makeSupabaseBackend(url: string, anonKey: string): Backend {
   const sb: SupabaseClient = createClient(url, anonKey);
@@ -90,16 +90,16 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
       if (rows.length) check((await sb.from(table).insert(rows.map(clean))).error);
     },
 
-    async uploadFile(file, folder) {
+    async uploadFile(file, folder, bucket = 'pieces-jointes') {
       if (file.size > 20 * 1024 * 1024) throw new Error('Fichier trop lourd (20 Mo maximum).');
       const safe = file.name.normalize('NFD').replace(/[^\w.-]+/g, '_');
       const path = `${folder}/${Date.now()}-${safe}`;
-      check((await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type })).error);
+      check((await sb.storage.from(bucket).upload(path, file, { contentType: file.type })).error);
       return { path, url: '' };
     },
 
-    async fileUrl(path) {
-      const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(path, 60 * 10);
+    async fileUrl(path, _fallback, bucket = 'pieces-jointes') {
+      const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 60 * 10);
       check(error);
       return data!.signedUrl;
     },
