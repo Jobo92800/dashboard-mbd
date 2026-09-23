@@ -104,7 +104,8 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
     async uploadAvatar(image, folder) {
       // Nouveau nom à chaque fois : l'ancienne photo ne reste pas en cache chez les autres.
       const path = `${folder}/${Date.now()}.jpg`;
-      check((await sb.storage.from('avatars').upload(path, image, { contentType: 'image/jpeg', upsert: true })).error);
+      // Nom unique : un simple dépôt suffit (l'option « remplacer » exigerait en plus le droit de lecture).
+      check((await sb.storage.from('avatars').upload(path, image, { contentType: 'image/jpeg' })).error);
       return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl;
     },
 
