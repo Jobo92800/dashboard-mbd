@@ -20,6 +20,7 @@ Reprend tout ce que faisait `MA_HQ_V22_STABLE.html` et ajoute :
 | **Modèles d’étapes** à la création d’un projet | Webinaire, protocole, campagne… sans tout ressaisir |
 | **Charge de travail** par personne | Répartir avant de surcharger |
 | **Archivage** des projets, **historique** d’activité | Rien ne se perd |
+| **Messagerie interne** : à une personne, à plusieurs ou à toute l’équipe, groupes nommés, non-lus | Échanger sans WhatsApp perso ; conversations privées, même pour les admins |
 | **Export agenda (.ics)** | Ajouter ses réunions à Google Agenda / iPhone |
 | Mobile, charte MAbeautyplus | Utilisable en centre, sur téléphone |
 
@@ -42,7 +43,8 @@ Puis ouvrir http://localhost:5190.
 
 1. **Créer un projet Supabase** (supabase.com → New project, région Europe).
 2. **Créer les tables** : Supabase → *SQL Editor* → *New query* → coller tout le
-   fichier `supabase/migrations/001_schema.sql` → *Run*.
+   fichier `supabase/migrations/001_schema.sql` → *Run*. Recommencer avec
+   `002_messagerie.sql` (et chaque fichier suivant, dans l’ordre).
 3. **Autoriser l’adresse du site** : *Authentication → URL Configuration* :
    - *Site URL* : l’adresse Netlify du site (ex. `https://mahq.netlify.app`)
    - *Redirect URLs* : ajouter `https://mahq.netlify.app/mot-de-passe`
@@ -73,6 +75,7 @@ Puis ouvrir http://localhost:5190.
 | Événements | Tous | Ceux où il est invité / qu’il organise |
 | Commenter, @mentionner | ✓ | Dans ses projets |
 | Inviter, changer un rôle, désactiver un accès | ✓ | — |
+| Lire une conversation privée | Seulement s’il y participe | Seulement s’il y participe |
 
 Ces règles sont appliquées **par la base de données** (RLS), pas seulement par
 l’écran : un membre ne peut pas contourner ses droits. Un compte désactivé ne

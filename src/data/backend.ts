@@ -20,6 +20,8 @@ export interface Backend {
   insert<T extends Table>(table: T, row: Snapshot[T][number]): Promise<void>;
   update<T extends Table>(table: T, id: string, patch: Partial<Snapshot[T][number]>): Promise<void>;
   remove(table: Table, id: string): Promise<void>;
+  /** Crée ou remplace la ligne portant cet id. */
+  upsert<T extends Table>(table: T, row: Snapshot[T][number]): Promise<void>;
   inviteMember(m: NewMember): Promise<{ tempPassword?: string }>;
   /** Prévient quand les données changent ailleurs (autre onglet, collègue). */
   subscribe(cb: () => void): () => void;

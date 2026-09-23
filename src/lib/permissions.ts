@@ -32,7 +32,15 @@ export const canEditEvent = (me: Profile, e: CalEvent) => isAdmin(me) || e.creat
 
 /** Ce qu'un utilisateur a le droit de lire (mode démo ; en mode réel la base filtre déjà). */
 export function visibleFor(me: Profile, s: Snapshot): Snapshot {
-  if (isAdmin(me)) return { ...s, notifications: s.notifications.filter((n) => n.user_id === me.id) };
+  const convs = s.conversations.filter((c) => c.member_ids.includes(me.id));
+  const convIds = new Set(convs.map((c) => c.id));
+  const privateParts = {
+    notifications: s.notifications.filter((n) => n.user_id === me.id),
+    conversations: convs,
+    messages: s.messages.filter((m) => convIds.has(m.conversation_id)),
+    reads: s.reads.filter((r) => r.user_id === me.id),
+  };
+  if (isAdmin(me)) return { ...s, ...privateParts };
   const projects = s.projects.filter((p) => p.member_ids.includes(me.id));
   const ids = new Set(projects.map((p) => p.id));
   return {
@@ -41,7 +49,7 @@ export function visibleFor(me: Profile, s: Snapshot): Snapshot {
     tasks: s.tasks.filter((t) => canSeeTask(me, t, projects)),
     comments: s.comments.filter((c) => ids.has(c.project_id)),
     events: s.events.filter((e) => canSeeEvent(me, e)),
-    notifications: s.notifications.filter((n) => n.user_id === me.id),
+    ...privateParts,
     activity: s.activity.filter((a) => (a.project_id ? ids.has(a.project_id) : a.actor_id === me.id)),
   };
 }

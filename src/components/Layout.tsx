@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CalendarDays, FolderKanban, ListChecks, LogOut, Menu, Search, ShieldCheck, Sun, Users } from 'lucide-react';
+import { Bell, CalendarDays, FolderKanban, ListChecks, LogOut, Menu, MessagesSquare, Search, ShieldCheck, Sun, Users } from 'lucide-react';
 import { useStore } from '../state/store';
 import { isAdmin } from '../lib/permissions';
 import { fmtStamp } from '../lib/dates';
@@ -8,9 +8,10 @@ import { isLate } from '../lib/selectors';
 import { resetDemo } from '../data/demoBackend';
 import { AvailDot, Avatar, IconButton } from './ui';
 import { SearchPalette } from './SearchPalette';
+import { useToast } from '../state/toast';
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { me, snap, mode, loaded } = useStore();
+  const { me, snap, mode, loaded, unreadMessages } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const loc = useLocation();
@@ -29,6 +30,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { to: '/', label: 'Ma journée', icon: Sun, count: myLate },
     { to: '/projets', label: 'Projets', icon: FolderKanban },
     { to: '/taches', label: 'Tâches', icon: ListChecks },
+    { to: '/messages', label: 'Messages', icon: MessagesSquare, count: unreadMessages },
     { to: '/agenda', label: 'Agenda', icon: CalendarDays },
     { to: '/equipe', label: 'Équipe', icon: Users },
   ];
@@ -111,6 +113,10 @@ export function Layout({ children }: { children: ReactNode }) {
             <kbd className="hidden rounded-mab-puce border border-mab-filet bg-white px-1.5 text-[11px] sm:inline">⌘K</kbd>
           </button>
           <div className="ml-auto flex items-center gap-1">
+            <Link to="/messages" aria-label="Messages" className="relative grid h-9 w-9 place-items-center rounded-mab-pilule text-mab-texte hover:bg-mab-wash-2 hover:text-mab-aqua-texte">
+              <MessagesSquare size={19} />
+              {unreadMessages > 0 && <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-mab-rose px-1 text-[10px] font-bold text-white">{unreadMessages}</span>}
+            </Link>
             <Notifications />
             <Link to="/profil" className="rounded-full lg:hidden" aria-label="Mon profil"><Avatar p={me} size={34} /></Link>
           </div>
@@ -122,8 +128,29 @@ export function Layout({ children }: { children: ReactNode }) {
         </main>
       </div>
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <MessageWatcher />
     </div>
   );
+}
+
+/** Prévient d'un message reçu quand on n'est pas déjà dans la conversation. */
+function MessageWatcher() {
+  const { snap, me, byId, loaded } = useStore();
+  const toast = useToast();
+  const loc = useLocation();
+  const seen = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!loaded) return;
+    if (!seen.current) { seen.current = new Set(snap.messages.map((m) => m.id)); return; }
+    for (const m of snap.messages) {
+      if (seen.current.has(m.id)) continue;
+      seen.current.add(m.id);
+      if (m.author_id === me?.id || loc.pathname === `/messages/${m.conversation_id}`) continue;
+      const who = byId.get(m.author_id)?.full_name.split(' ')[0] ?? 'Quelqu’un';
+      toast(`💬 ${who} : ${m.body.length > 60 ? m.body.slice(0, 60) + '…' : m.body}`);
+    }
+  }, [snap.messages, loaded, me?.id, byId, loc.pathname, toast]);
+  return null;
 }
 
 function Notifications() {

@@ -15,7 +15,8 @@ export const DEMO_PASSWORD = 'demo';
 function read(): Snapshot {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw) as Snapshot;
+    // Les démos créées avant la messagerie n'ont pas ces tables : on les complète.
+    if (raw) return { conversations: [], messages: [], reads: [], ...JSON.parse(raw) } as Snapshot;
   } catch { /* stockage indisponible : on repart du jeu d'exemple */ }
   return structuredClone(seed) as Snapshot;
 }
@@ -76,12 +77,24 @@ export const demoBackend: Backend = {
     write(s);
   },
 
+  async upsert(table, row) {
+    const s = read();
+    const list = s[table] as { id: string }[];
+    const i = list.findIndex((r) => r.id === (row as { id: string }).id);
+    if (i >= 0) list[i] = row as { id: string }; else list.unshift(row as { id: string });
+    write(s);
+  },
+
   async remove(table: Table, id: string) {
     const s = read();
     (s[table] as { id: string }[]) = (s[table] as { id: string }[]).filter((r) => r.id !== id);
     if (table === 'projects') {
       s.tasks = s.tasks.filter((t) => t.project_id !== id);
       s.comments = s.comments.filter((c) => c.project_id !== id);
+    }
+    if (table === 'conversations') {
+      s.messages = s.messages.filter((m) => m.conversation_id !== id);
+      s.reads = s.reads.filter((r) => r.conversation_id !== id);
     }
     write(s);
   },

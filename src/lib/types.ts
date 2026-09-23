@@ -90,6 +90,32 @@ export interface Activity {
   created_at: string;
 }
 
+/** Conversation privée : visible uniquement de ses participants (admins compris). */
+export interface Conversation {
+  id: string;
+  title: string | null; // null = discussion à deux ou groupe sans nom
+  member_ids: string[];
+  created_by: string | null;
+  created_at: string;
+  last_message_at: string;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+}
+
+/** Dernière lecture d'une conversation par une personne (id = conversation:personne). */
+export interface ReadMark {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  read_at: string;
+}
+
 export interface Snapshot {
   profiles: Profile[];
   projects: Project[];
@@ -98,6 +124,9 @@ export interface Snapshot {
   events: CalEvent[];
   notifications: Notification[];
   activity: Activity[];
+  conversations: Conversation[];
+  messages: Message[];
+  reads: ReadMark[];
 }
 
 export type Table = keyof Snapshot;

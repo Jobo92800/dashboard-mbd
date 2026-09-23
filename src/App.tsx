@@ -11,6 +11,7 @@ import Agenda from './pages/Agenda';
 import Team from './pages/Team';
 import Admin from './pages/Admin';
 import Profile from './pages/Profile';
+import Messages from './pages/Messages';
 
 export default function App() {
   const { me, booting, recovery } = useStore();
@@ -35,6 +36,8 @@ export default function App() {
         <Route path="/projets/:id" element={<ProjectDetail />} />
         <Route path="/taches" element={<Tasks />} />
         <Route path="/agenda" element={<Agenda />} />
+        <Route path="/messages" element={<Messages />} />
+        <Route path="/messages/:id" element={<Messages />} />
         <Route path="/equipe" element={<Team />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/profil" element={<Profile />} />

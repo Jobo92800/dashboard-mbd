@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderKanban, ListChecks, Search, UserRound } from 'lucide-react';
+import { FolderKanban, ListChecks, MessagesSquare, Search, UserRound } from 'lucide-react';
 import { useStore } from '../state/store';
 import { relativeLabel } from '../lib/dates';
+import { conversationName } from '../lib/conversations';
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { snap } = useStore();
+  const { snap, me, byId } = useStore();
   const nav = useNavigate();
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
@@ -23,10 +24,14 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
       const p = snap.projects.find((x) => x.id === t.project_id);
       out.push({ key: t.id, icon: ListChecks, title: t.title, sub: `${p ? p.name : 'Tâche rapide'} · ${relativeLabel(t.due_date)}`, to: p ? `/projets/${p.id}?tache=${t.id}` : `/taches?tache=${t.id}` });
     });
+    snap.messages.filter((m) => norm(m.body).includes(n)).slice(-5).reverse().forEach((m) => {
+      const c = snap.conversations.find((x) => x.id === m.conversation_id);
+      if (c) out.push({ key: m.id, icon: MessagesSquare, title: m.body, sub: `Message · ${conversationName(c, me!.id, byId)}`, to: `/messages/${c.id}` });
+    });
     snap.profiles.filter((p) => norm(p.full_name + ' ' + p.job_title).includes(n)).slice(0, 4)
       .forEach((p) => out.push({ key: p.id, icon: UserRound, title: p.full_name, sub: p.job_title, to: `/equipe?personne=${p.id}` }));
     return out;
-  }, [q, snap]);
+  }, [q, snap, me, byId]);
 
   if (!open) return null;
   const go = (to: string) => { onClose(); nav(to); };

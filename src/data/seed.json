@@ -1219,5 +1219,69 @@
   }
  ],
  "notifications": [],
- "activity": []
+ "activity": [],
+ "conversations": [
+  {
+   "id": "conv-jo-nico",
+   "title": null,
+   "member_ids": [
+    "u-jo",
+    "u-nico"
+   ],
+   "created_by": "u-nico",
+   "created_at": "2026-09-23T07:30:00.000Z",
+   "last_message_at": "2026-09-23T08:12:00.000Z"
+  },
+  {
+   "id": "conv-webinaire",
+   "title": "Cellule webinaire",
+   "member_ids": [
+    "u-nico",
+    "u-leslie",
+    "u-jo",
+    "u-elisa"
+   ],
+   "created_by": "u-elisa",
+   "created_at": "2026-09-23T07:00:00.000Z",
+   "last_message_at": "2026-09-23T09:05:00.000Z"
+  }
+ ],
+ "messages": [
+  {
+   "id": "m1",
+   "conversation_id": "conv-jo-nico",
+   "author_id": "u-nico",
+   "body": "Tu peux me faire un point sur le tracking Meta avant midi ?",
+   "created_at": "2026-09-23T08:10:00.000Z"
+  },
+  {
+   "id": "m2",
+   "conversation_id": "conv-jo-nico",
+   "author_id": "u-jo",
+   "body": "Oui, je vérifie les événements de conversion et je te redis.",
+   "created_at": "2026-09-23T08:12:00.000Z"
+  },
+  {
+   "id": "m3",
+   "conversation_id": "conv-webinaire",
+   "author_id": "u-elisa",
+   "body": "J’ai créé ce groupe pour caler le runbook du live. Répétition générale le 7/10 à 14 h, ça va pour tout le monde ?",
+   "created_at": "2026-09-23T08:50:00.000Z"
+  },
+  {
+   "id": "m4",
+   "conversation_id": "conv-webinaire",
+   "author_id": "u-leslie",
+   "body": "Ok pour moi 👍",
+   "created_at": "2026-09-23T09:01:00.000Z"
+  },
+  {
+   "id": "m5",
+   "conversation_id": "conv-webinaire",
+   "author_id": "u-nico",
+   "body": "Parfait. Jo, tu prévois le test salle + micro juste avant ?",
+   "created_at": "2026-09-23T09:05:00.000Z"
+  }
+ ],
+ "reads": []
 }

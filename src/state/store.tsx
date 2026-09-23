@@ -2,10 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { backend } from '../data';
 import { uid } from '../data/backend';
 import type { NewMember } from '../data/backend';
-import type { CalEvent, Profile, Project, Snapshot, Task, TaskStatus } from '../lib/types';
+import type { CalEvent, Conversation, Message, Profile, Project, Snapshot, Task, TaskStatus } from '../lib/types';
 import { useToast } from './toast';
 
-const EMPTY: Snapshot = { profiles: [], projects: [], tasks: [], comments: [], events: [], notifications: [], activity: [] };
+const EMPTY: Snapshot = {
+  profiles: [], projects: [], tasks: [], comments: [], events: [], notifications: [], activity: [],
+  conversations: [], messages: [], reads: [],
+};
 const now = () => new Date().toISOString();
 
 type Store = ReturnType<typeof useStoreValue>;
@@ -250,6 +253,71 @@ function useStoreValue() {
       );
     },
 
+    /**
+     * Ouvre (ou retrouve) une conversation avec ces personnes. À deux et sans
+     * nom de groupe, on réutilise la discussion existante plutôt que d'en créer une autre.
+     */
+    async startConversation(otherIds: string[], title: string, firstMessage: string) {
+      const members = [...new Set([me!.id, ...otherIds])];
+      const cleanTitle = title.trim() || null;
+      const existing = !cleanTitle && members.length === 2
+        ? snap.conversations.find((c) => !c.title && c.member_ids.length === 2 && members.every((m) => c.member_ids.includes(m)))
+        : undefined;
+      const conv: Conversation = existing ?? {
+        id: uid(), title: cleanTitle, member_ids: members, created_by: me!.id, created_at: now(), last_message_at: now(),
+      };
+      if (!existing) {
+        await run((st) => ({ ...st, conversations: [conv, ...st.conversations] }), () => backend.insert('conversations', conv));
+      }
+      if (firstMessage.trim()) await actions.sendMessage(conv, firstMessage);
+      return conv.id;
+    },
+
+    sendMessage(conv: Conversation, body: string) {
+      const at = now();
+      const msg: Message = { id: uid(), conversation_id: conv.id, author_id: me!.id, body: body.trim(), created_at: at };
+      const mark = { id: `${conv.id}:${me!.id}`, conversation_id: conv.id, user_id: me!.id, read_at: at };
+      return run(
+        (st) => ({
+          ...st,
+          messages: [...st.messages, msg],
+          conversations: st.conversations.map((c) => (c.id === conv.id ? { ...c, last_message_at: at } : c)),
+          reads: [...st.reads.filter((r) => r.id !== mark.id), mark],
+        }),
+        async () => {
+          await backend.insert('messages', msg);
+          await backend.update('conversations', conv.id, { last_message_at: at });
+          await backend.upsert('reads', mark);
+        },
+      );
+    },
+
+    markConversationRead(convId: string) {
+      const mark = { id: `${convId}:${me!.id}`, conversation_id: convId, user_id: me!.id, read_at: now() };
+      return run((st) => ({ ...st, reads: [...st.reads.filter((r) => r.id !== mark.id), mark] }), () => backend.upsert('reads', mark));
+    },
+
+    updateConversation(conv: Conversation, patch: Partial<Conversation>, okText?: string) {
+      return run(
+        (st) => ({ ...st, conversations: st.conversations.map((c) => (c.id === conv.id ? { ...c, ...patch } : c)) }),
+        () => backend.update('conversations', conv.id, patch),
+        okText,
+      );
+    },
+
+    leaveConversation(conv: Conversation) {
+      const rest = conv.member_ids.filter((id) => id !== me!.id);
+      return run(
+        (st) => ({ ...st, conversations: st.conversations.filter((c) => c.id !== conv.id), messages: st.messages.filter((m) => m.conversation_id !== conv.id) }),
+        () => (rest.length ? backend.update('conversations', conv.id, { member_ids: rest }) : backend.remove('conversations', conv.id)),
+        'Conversation quittée',
+      );
+    },
+
+    deleteMessage(id: string) {
+      return run((st) => ({ ...st, messages: st.messages.filter((m) => m.id !== id) }), () => backend.remove('messages', id));
+    },
+
     markRead(id: string) {
       return run(
         (s) => ({ ...s, notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) }),
@@ -260,7 +328,20 @@ function useStoreValue() {
 
   const byId = useMemo(() => new Map(snap.profiles.map((p) => [p.id, p])), [snap.profiles]);
 
-  return { me, booting, loaded, snap, byId, recovery, setRecovery, mode: backend.mode, reload, ...actions };
+  /** Messages non lus par conversation (ceux des autres, postérieurs à ma dernière lecture). */
+  const unreadByConv = useMemo(() => {
+    const out = new Map<string, number>();
+    if (!me) return out;
+    const readAt = new Map(snap.reads.filter((r) => r.user_id === me.id).map((r) => [r.conversation_id, r.read_at]));
+    for (const m of snap.messages) {
+      if (m.author_id === me.id) continue;
+      if (m.created_at > (readAt.get(m.conversation_id) ?? '')) out.set(m.conversation_id, (out.get(m.conversation_id) ?? 0) + 1);
+    }
+    return out;
+  }, [snap.messages, snap.reads, me]);
+  const unreadMessages = [...unreadByConv.values()].reduce((a, b) => a + b, 0);
+
+  return { me, booting, loaded, snap, byId, unreadByConv, unreadMessages, recovery, setRecovery, mode: backend.mode, reload, ...actions };
 }
 
 function escapeRe(s: string) {

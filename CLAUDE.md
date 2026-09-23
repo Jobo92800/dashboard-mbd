@@ -18,5 +18,10 @@ expliquer en français, sans jargon.
 - Invitation : fonction Netlify `invite-member` (clé service_role côté serveur).
 - Couleurs de projets/personnes prises dans la DA (`src/lib/palette.ts`).
 
+- Messagerie (23 sept.) : tables `conversations` / `messages` / `reads`
+  (migration 002). Conversations **privées, admins compris**. Discussion à deux
+  réutilisée si elle existe ; y ajouter quelqu'un crée un nouveau groupe.
+  Non-lus = messages des autres postérieurs à `reads.read_at`.
+
 ## Règles
 - Pas de push GitHub ni de déploiement Netlify sans demande explicite.

@@ -1,5 +1,5 @@
 import { useSearchParams, Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { Mail, MessageSquare } from 'lucide-react';
 import { useStore } from '../state/store';
 import type { Profile } from '../lib/types';
 import { isDone, isLate, sortTasks } from '../lib/selectors';
@@ -42,7 +42,7 @@ export default function Team() {
 }
 
 function PersonCard({ p, max, active, onClick }: { p: Profile; max: number; active: boolean; onClick: () => void }) {
-  const { snap } = useStore();
+  const { snap, me } = useStore();
   const open = snap.tasks.filter((t) => t.assignee_id === p.id && !isDone(t));
   const late = open.filter(isLate).length;
   const projects = snap.projects.filter((x) => x.status === 'en_cours' && x.member_ids.includes(p.id));
@@ -74,7 +74,12 @@ function PersonCard({ p, max, active, onClick }: { p: Profile; max: number; acti
           </Link>
         ))}
       </div>
-      <a href={`mailto:${p.email}`} className="mt-3 inline-flex items-center gap-1.5 text-xs text-mab-aqua-texte hover:underline"><Mail size={13} /> {p.email}</a>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+        {p.id !== me!.id && (
+          <Link to={`/messages?a=${p.id}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-mab-aqua-texte hover:underline"><MessageSquare size={15} /> Écrire</Link>
+        )}
+        <a href={`mailto:${p.email}`} className="inline-flex items-center gap-1.5 text-xs text-mab-texte hover:underline"><Mail size={13} /> {p.email}</a>
+      </div>
     </Card>
   );
 }

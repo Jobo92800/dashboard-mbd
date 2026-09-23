@@ -9,7 +9,7 @@ function clean<T extends object>(row: T): T {
   return out as unknown as T;
 }
 
-const TABLES: Table[] = ['profiles', 'projects', 'tasks', 'comments', 'events', 'notifications', 'activity'];
+const TABLES: Table[] = ['profiles', 'projects', 'tasks', 'comments', 'events', 'notifications', 'activity', 'conversations', 'messages', 'reads'];
 
 export function makeSupabaseBackend(url: string, anonKey: string): Backend {
   const sb: SupabaseClient = createClient(url, anonKey);
@@ -62,6 +62,7 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
         TABLES.map((t) => {
           let q = sb.from(t).select('*');
           if (t === 'activity' || t === 'notifications') q = q.order('created_at', { ascending: false }).limit(200);
+          if (t === 'messages') q = q.order('created_at', { ascending: false }).limit(3000);
           return q;
         }),
       );
@@ -79,6 +80,10 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
 
     async update(table, id, patch) {
       check((await sb.from(table).update(clean(patch as Record<string, unknown>)).eq('id', id)).error);
+    },
+
+    async upsert(table, row) {
+      check((await sb.from(table).upsert(clean(row))).error);
     },
 
     async remove(table, id) {

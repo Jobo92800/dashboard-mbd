@@ -12,9 +12,10 @@ import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { AvailabilityPicker } from '../components/AvailabilityPicker';
 import { Avatar, AvailDot, Badge, Button, Card, Empty, PageTitle, Progress, Stat, Surtitre } from '../components/ui';
 import { fmtDur } from '../components/EventModal';
+import { conversationName } from '../lib/conversations';
 
 export default function Home() {
-  const { me, snap, byId } = useStore();
+  const { me, snap, byId, unreadByConv } = useStore();
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const today = todayIso();
   const in7 = toIso(addDays(new Date(), 7));
@@ -79,6 +80,20 @@ export default function Home() {
         </Card>
 
         <div className="grid content-start gap-6">
+          {unreadByConv.size > 0 && (
+            <Card className="border-mab-filet-rose p-5">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Messages non lus</h2>
+                <Link to="/messages" className="text-sm text-mab-aqua-texte hover:underline">Messagerie</Link>
+              </div>
+              {snap.conversations.filter((c) => unreadByConv.has(c.id)).map((c) => (
+                <Link key={c.id} to={`/messages/${c.id}`} className="flex items-center justify-between gap-3 border-b border-mab-filet py-2.5 last:border-0 hover:bg-mab-wash">
+                  <span className="truncate font-medium">{conversationName(c, me!.id, byId)}</span>
+                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-mab-rose px-1.5 text-[11px] font-bold text-white">{unreadByConv.get(c.id)}</span>
+                </Link>
+              ))}
+            </Card>
+          )}
           <Card className="p-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Mes rendez-vous</h2>
