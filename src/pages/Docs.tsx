@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Bold, BookOpen, Eye, FilePlus2, Heading2, Link2, List, ListChecks, Lock, Pencil, Pin, Search, Trash2 } from 'lucide-react';
+import { ArrowLeft, Bold, BookOpen, Eye, FilePlus2, FileText, Heading2, ImageIcon, Link2, List, ListChecks, Lock, Paperclip, Pencil, Pin, Search, Trash2, Upload, X } from 'lucide-react';
 import { useStore } from '../state/store';
 import type { Doc } from '../lib/types';
 import { DOC_CATEGORIES } from '../lib/types';
@@ -8,7 +8,12 @@ import { fmtStamp } from '../lib/dates';
 import { isAdmin } from '../lib/permissions';
 import { Markdown } from '../lib/markdown';
 import { AttachmentList } from '../components/TaskExtras';
-import { Badge, Button, Card, Empty, Field, IconButton, Input, Select } from '../components/ui';
+import { Badge, Button, Card, Empty, Field, IconButton, Input, Modal, Select } from '../components/ui';
+import { FilePreview, canPreview, isImage, isPdf } from '../components/FilePreview';
+import { useToast } from '../state/toast';
+
+const ACCEPT = 'application/pdf,image/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.key,.pages,.numbers,.zip';
+const fmtSize = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} Ko` : `${(n / 1024 / 1024).toFixed(1)} Mo`);
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -18,6 +23,9 @@ export default function Docs() {
   const nav = useNavigate();
   const [cat, setCat] = useState('');
   const [q, setQ] = useState('');
+  const [importing, setImporting] = useState<File[] | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const pick = useRef<HTMLInputElement>(null);
   const current = snap.docs.find((d) => d.id === id);
   const isNew = id === 'nouveau';
 
@@ -30,12 +38,26 @@ export default function Docs() {
   const counts = (c: string) => snap.docs.filter((d) => d.category === c).length;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div
+      className={`relative grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] ${dragOver ? 'rounded-mab-carte ring-2 ring-mab-aqua ring-offset-4' : ''}`}
+      onDragOver={(e) => { if (!id && e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragOver(true); } }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }}
+      onDrop={(e) => { if (id) return; e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) setImporting(Array.from(e.dataTransfer.files)); }}
+    >
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-mab-carte bg-mab-wash-2/80">
+          <p className="rounded-mab-pilule bg-white px-6 py-3 font-semibold text-mab-aqua-texte shadow-mab-flottante"><Upload size={18} className="mr-2 inline" /> Dépose tes fichiers pour les importer</p>
+        </div>
+      )}
       <aside className={`${id ? 'hidden lg:block' : ''}`}>
         <div className="mb-4 flex items-center justify-between gap-2">
           <h1 className="text-[28px] font-light leading-tight">Procédures & <b className="font-semibold">documents</b></h1>
         </div>
-        <Button variant="secondaire" className="mb-4 w-full" onClick={() => nav('/documents/nouveau')}><FilePlus2 size={16} /> Nouveau document</Button>
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <Button variant="secondaire" className="!px-3" onClick={() => nav('/documents/nouveau')}><FilePlus2 size={16} /> Nouveau</Button>
+          <Button variant="secondaire" className="!px-3" onClick={() => pick.current?.click()}><Upload size={16} /> Importer</Button>
+          <input ref={pick} type="file" multiple accept={ACCEPT} hidden onChange={(e) => { if (e.target.files?.length) setImporting(Array.from(e.target.files)); e.target.value = ''; }} />
+        </div>
         <div className="mb-3 flex h-10 items-center gap-2 rounded-mab-pilule border border-mab-filet bg-white px-4">
           <Search size={15} className="text-mab-gris" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher dans les documents" className="flex-1 bg-transparent text-sm outline-none" />
@@ -73,16 +95,25 @@ export default function Docs() {
               icon={<BookOpen size={32} />}
               title="La mémoire de l’équipe"
               text="Protocoles, scripts commerciaux, runbooks, accès utiles : tout ce qu’on se repasse en PDF, rangé et à jour."
-              action={<Button variant="secondaire" onClick={() => nav('/documents/nouveau')}>Créer un document</Button>}
+              action={
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button variant="secondaire" onClick={() => pick.current?.click()}><Upload size={16} /> Importer des fichiers</Button>
+                    <Button variant="discret" onClick={() => nav('/documents/nouveau')}>Écrire un document</Button>
+                  </div>
+                  <p className="text-xs text-mab-gris-doux">PDF, images, Word, Excel… ou glisse-les directement sur cette page.</p>
+                </div>
+              }
             />
           )}
       </section>
+      <ImportModal files={importing} onClose={() => setImporting(null)} onDone={(firstId) => { setImporting(null); if (firstId) nav(`/documents/${firstId}`); }} />
     </div>
   );
 }
 
 function DocView({ doc }: { doc: Doc }) {
-  const { me, byId, deleteDoc, addDocAttachment, removeDocAttachment, saveDoc } = useStore();
+  const { me, byId, deleteDoc, addDocAttachments, removeDocAttachment, saveDoc } = useStore();
   const nav = useNavigate();
   const [editing, setEditing] = useState(false);
   const admin = isAdmin(me);
@@ -106,10 +137,17 @@ function DocView({ doc }: { doc: Doc }) {
       </div>
       <h1 className="mt-3 text-[30px] font-light leading-tight tracking-tight text-mab-encre">{doc.title}</h1>
       <p className="mt-1 text-xs text-mab-gris-doux">Mis à jour par {byId.get(doc.updated_by ?? '')?.full_name ?? '—'} le {fmtStamp(doc.updated_at)}</p>
-      <div className="mt-6">{doc.content.trim() ? <Markdown text={doc.content} /> : <p className="text-mab-gris-doux">Document vide.</p>}</div>
+      {doc.content.trim()
+        ? <div className="mt-6"><Markdown text={doc.content} /></div>
+        : !doc.attachments.some(canPreview) && <p className="mt-6 text-mab-gris-doux">Document vide.</p>}
+      {doc.attachments.filter(canPreview).length > 0 && (
+        <div className="mt-6 grid gap-4">
+          {doc.attachments.filter(canPreview).map((a) => <FilePreview key={a.id} a={a} />)}
+        </div>
+      )}
       <div className="mt-8 border-t border-mab-filet pt-5">
         <p className="mb-2.5 text-sm font-semibold">Fichiers et liens</p>
-        <AttachmentList items={doc.attachments} disabled={!canEdit} onAdd={(input) => addDocAttachment(doc, input)} onRemove={(aid) => removeDocAttachment(doc, aid)} />
+        <AttachmentList items={doc.attachments} disabled={!canEdit} onAdd={(inputs) => addDocAttachments(doc.id, inputs)} onRemove={(aid) => removeDocAttachment(doc, aid)} />
       </div>
     </Card>
   );
@@ -124,9 +162,13 @@ const TOOLS = [
 ];
 
 function DocEditor({ doc, onDone, onCancel }: { doc?: Doc; onDone: (id: string) => void; onCancel: () => void }) {
-  const { me, saveDoc } = useStore();
+  const { me, saveDoc, addDocAttachments } = useStore();
+  const toast = useToast();
   const [d, setD] = useState<Partial<Doc>>(doc ?? { title: '', category: 'Protocoles', content: '', admins_only: false });
   const [preview, setPreview] = useState(false);
+  const [pending, setPending] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const filesRef = useRef<HTMLInputElement>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (doc) setD(doc); }, [doc]);
   const admin = isAdmin(me);
@@ -144,8 +186,15 @@ function DocEditor({ doc, onDone, onCancel }: { doc?: Doc; onDone: (id: string) 
   };
 
   const save = async () => {
-    if (!d.title?.trim()) return;
-    const id = await saveDoc({ ...d, title: d.title.trim() } as Doc);
+    const title = d.title?.trim() || (pending[0] ? pending[0].name.replace(/\.[^.]+$/, '') : '');
+    if (!title) return;
+    setBusy(true);
+    const id = await saveDoc({ ...d, title } as Doc);
+    if (pending.length) {
+      try { await addDocAttachments(id, pending.map((file) => ({ file }))); }
+      catch (e) { toast((e as Error).message, 'erreur'); }
+    }
+    setBusy(false);
     onDone(id);
   };
 
@@ -191,11 +240,87 @@ function DocEditor({ doc, onDone, onCancel }: { doc?: Doc; onDone: (id: string) 
         )}
         <p className="mt-1 text-xs text-mab-gris-doux"># titre · ## sous-titre · - liste · 1. étapes · - [ ] case · **gras** · [texte](lien) · &gt; encadré</p>
       </div>
+      {!doc && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setPending((p) => [...p, ...Array.from(e.dataTransfer.files)]); }}
+          className="rounded-mab-champ border border-dashed border-mab-filet-aqua bg-mab-wash p-4"
+        >
+          <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Paperclip size={15} /> Fichiers joints</p>
+          {pending.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {pending.map((f, i) => (
+                <span key={i} className="flex items-center gap-1.5 rounded-mab-pilule border border-mab-filet bg-white py-1 pl-3 pr-1 text-xs">
+                  {f.type.startsWith('image/') ? <ImageIcon size={13} /> : <FileText size={13} />}
+                  <span className="max-w-[200px] truncate">{f.name}</span><span className="text-mab-gris-doux">{fmtSize(f.size)}</span>
+                  <button aria-label={`Retirer ${f.name}`} onClick={() => setPending(pending.filter((_, j) => j !== i))} className="grid h-5 w-5 place-items-center rounded-full hover:bg-mab-rail"><X size={12} /></button>
+                </span>
+              ))}
+            </div>
+          )}
+          <Button variant="discret" onClick={() => filesRef.current?.click()}><Upload size={15} /> Ajouter des fichiers</Button>
+          <span className="text-xs text-mab-gris-doux">PDF, images, Word, Excel… ou glisse-les ici.</span>
+          <input ref={filesRef} type="file" multiple accept={ACCEPT} hidden onChange={(e) => { setPending((p) => [...p, ...Array.from(e.target.files ?? [])]); e.target.value = ''; }} />
+        </div>
+      )}
       <div className="flex justify-end gap-2">
         <Button variant="tertiaire" onClick={onCancel}>Annuler</Button>
-        <Button variant="primaire" disabled={!d.title?.trim()} onClick={save}>Enregistrer</Button>
+        <Button variant="primaire" disabled={(!d.title?.trim() && !pending.length) || busy} onClick={save}>{busy ? 'Envoi des fichiers…' : 'Enregistrer'}</Button>
       </div>
-      {!doc && <p className="text-xs text-mab-gris-doux">Les fichiers (PDF, images…) s’ajoutent une fois le document enregistré.</p>}
     </Card>
   );
 }
+
+/** Import rapide : chaque fichier devient un document, rangé dans la catégorie choisie. */
+function ImportModal({ files, onClose, onDone }: { files: File[] | null; onClose: () => void; onDone: (firstId: string | null) => void }) {
+  const { me, importDocs } = useStore();
+  const [category, setCategory] = useState<string>('Protocoles');
+  const [adminsOnly, setAdminsOnly] = useState(false);
+  const [list, setList] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (files) { setList(files); setAdminsOnly(false); } }, [files]);
+  if (!files) return null;
+  const total = list.reduce((n, f) => n + f.size, 0);
+  const submit = async () => {
+    setBusy(true);
+    const first = await importDocs(list, { category, admins_only: adminsOnly });
+    setBusy(false);
+    onDone(first);
+  };
+  return (
+    <Modal
+      open
+      onClose={busy ? () => {} : onClose}
+      title={`Importer ${list.length} fichier${list.length > 1 ? 's' : ''}`}
+      footer={<><Button variant="tertiaire" disabled={busy} onClick={onClose}>Annuler</Button><Button variant="primaire" disabled={!list.length || busy} onClick={submit}><Upload size={16} /> {busy ? 'Import en cours…' : 'Importer'}</Button></>}
+    >
+      <div className="grid gap-4">
+        <p className="text-sm text-mab-texte">Chaque fichier devient un document, avec le nom du fichier comme titre. Tu pourras ensuite ajouter un texte, renommer ou déplacer.</p>
+        <div className="grid max-h-60 gap-1.5 overflow-y-auto">
+          {list.map((f, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-mab-champ border border-mab-filet px-3 py-2 text-sm">
+              {f.type.startsWith('image/') ? <ImageIcon size={16} className="text-mab-violet-texte" /> : <FileText size={16} className="text-mab-aqua-texte" />}
+              <span className="min-w-0 flex-1 truncate">{f.name}</span>
+              <span className="text-xs text-mab-gris-doux">{fmtSize(f.size)}</span>
+              {!busy && <IconButton label="Retirer" className="!h-7 !w-7" onClick={() => setList(list.filter((_, j) => j !== i))}><X size={14} /></IconButton>}
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-mab-gris-doux">{fmtSize(total)} au total · 50 Mo maximum par fichier.</p>
+        <Field label="Catégorie">
+          <Select value={category} onChange={(e) => setCategory(e.target.value)}>
+            {DOC_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+          </Select>
+        </Field>
+        {isAdmin(me) && (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="h-4 w-4 accent-mab-aqua" checked={adminsOnly} onChange={(e) => setAdminsOnly(e.target.checked)} />
+            <Lock size={14} /> Réservé aux administrateurs
+          </label>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+export { isImage, isPdf };

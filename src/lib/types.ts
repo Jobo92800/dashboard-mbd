@@ -20,6 +20,7 @@ export interface Profile {
   availability: Availability;
   availability_note: string;
   recap_email: boolean; // reçoit le récap du lundi (et le bilan du vendredi pour les admins)
+  avatar_url: string | null; // photo de profil (sinon : initiales sur fond de couleur)
 }
 
 export interface Project {
@@ -49,7 +50,7 @@ export interface ChecklistItem { id: string; text: string; done: boolean }
 
 /** Lien (Canva, Drive…) ou fichier déposé. `path` = emplacement dans le stockage pour un fichier. */
 export type Bucket = 'pieces-jointes' | 'messagerie' | 'documents';
-export interface Attachment { id: string; name: string; url: string; kind: 'lien' | 'fichier'; path?: string; size?: number; bucket?: Bucket }
+export interface Attachment { id: string; name: string; url: string; kind: 'lien' | 'fichier'; path?: string; size?: number; bucket?: Bucket; mime?: string }
 
 /** Une tâche sans project_id est une « tâche rapide » (hors projet). */
 export interface Task {

@@ -91,12 +91,12 @@ const fmtSize = (n?: number) => (!n ? '' : n < 1024 * 1024 ? `${Math.round(n / 1
 
 /** Liens et fichiers joints à une tâche (enregistrés immédiatement). */
 export function Attachments({ task, disabled }: { task: Task; disabled?: boolean }) {
-  const { addAttachment, removeAttachment } = useStore();
+  const { addAttachments, removeAttachment } = useStore();
   return (
     <AttachmentList
       items={task.attachments}
       disabled={disabled}
-      onAdd={(input) => addAttachment(task, input)}
+      onAdd={(inputs) => addAttachments(task.id, inputs)}
       onRemove={(id) => removeAttachment(task, id)}
     />
   );
@@ -119,7 +119,7 @@ export function useOpenAttachment() {
 /** Liste de liens et fichiers joints (tâches, documents). */
 export function AttachmentList({ items, onAdd, onRemove, disabled }: {
   items: Attachment[];
-  onAdd: (input: { file?: File; name?: string; url?: string }) => Promise<void>;
+  onAdd: (inputs: { file?: File; name?: string; url?: string }[]) => Promise<void>;
   onRemove: (id: string) => void;
   disabled?: boolean;
 }) {
@@ -136,14 +136,14 @@ export function AttachmentList({ items, onAdd, onRemove, disabled }: {
     if (!files?.length) return;
     setBusy(true);
     try {
-      for (const f of Array.from(files)) await onAdd({ file: f });
+      await onAdd(Array.from(files).map((file) => ({ file })));
       toast(files.length > 1 ? `${files.length} fichiers ajoutés` : 'Fichier ajouté');
     } catch (e) { toast((e as Error).message, 'erreur'); }
     finally { setBusy(false); if (fileRef.current) fileRef.current.value = ''; }
   };
   const addLink = async () => {
     if (!url.trim()) return;
-    await onAdd({ url, name });
+    try { await onAdd([{ url, name }]); } catch (e) { toast((e as Error).message, 'erreur'); return; }
     setUrl(''); setName(''); setLinkOpen(false);
   };
 

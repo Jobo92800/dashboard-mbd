@@ -8,6 +8,8 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useToast } from './toast';
 import { nextColor as nextColorFor } from '../lib/palette';
 
+type AttachmentInput = { file?: File; name?: string; url?: string };
+
 const EMPTY: Snapshot = {
   profiles: [], projects: [], tasks: [], comments: [], events: [], notifications: [], activity: [],
   conversations: [], messages: [], reads: [], task_comments: [], templates: [],
@@ -26,6 +28,9 @@ function useStoreValue() {
   const [loaded, setLoaded] = useState(false);
   const [recovery, setRecovery] = useState(false);
   const meRef = useRef(me);
+  /** Toujours la version la plus récente des données (utile entre deux envois successifs). */
+  const snapRef = useRef(snap);
+  snapRef.current = snap;
   meRef.current = me;
 
   const reload = useCallback(async () => {
@@ -60,7 +65,11 @@ function useStoreValue() {
   /** Applique tout de suite à l'écran, enregistre, puis resynchronise. */
   const run = useCallback(
     async (optimistic: (s: Snapshot) => Snapshot, work: () => Promise<unknown>, okText?: string) => {
-      setSnap((s) => optimistic(structuredClone(s)));
+      setSnap((s) => {
+        const next = optimistic(structuredClone(s));
+        snapRef.current = next;
+        return next;
+      });
       try {
         await work();
         if (okText) toast(okText);
@@ -101,11 +110,21 @@ function useStoreValue() {
   const makeAttachment = async (input: { file?: File; name?: string; url?: string }, folder: string, bucket: Bucket): Promise<Attachment> => {
     if (input.file) {
       const { path, url } = await backend.uploadFile(input.file, folder, bucket);
-      return { id: uid(), name: input.file.name, url, path: path || undefined, kind: 'fichier', size: input.file.size, bucket };
+      return { id: uid(), name: input.file.name, url, path: path || undefined, kind: 'fichier', size: input.file.size, bucket, mime: input.file.type || undefined };
     }
     let url = (input.url ?? '').trim();
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     return { id: uid(), name: (input.name ?? '').trim() || url.replace(/^https?:\/\//, '').slice(0, 60), url, kind: 'lien' };
+  };
+
+  const uploadAll = async (inputs: AttachmentInput[], folder: string, bucket: Bucket) => {
+    const done: Attachment[] = [];
+    const errors: string[] = [];
+    for (const input of inputs) {
+      try { done.push(await makeAttachment(input, folder, bucket)); }
+      catch (e) { errors.push(`${input.file?.name ?? input.url} : ${(e as Error).message}`); }
+    }
+    return { done, errors };
   };
 
   const mentionedIn = (body: string) =>
@@ -262,14 +281,21 @@ function useStoreValue() {
       return actions.patchTask(t, { checklist });
     },
 
-    async addAttachment(t: Task, input: { file?: File; name?: string; url?: string }) {
-      const att = await makeAttachment(input, t.id, 'pieces-jointes');
-      const current = snap.tasks.find((x) => x.id === t.id) ?? t;
-      await actions.patchTask(current, { attachments: [...current.attachments, att] });
+    async addAttachment(t: Task, input: AttachmentInput) {
+      return actions.addAttachments(t.id, [input]);
+    },
+
+    /** Dépose plusieurs fichiers puis les enregistre d'un coup (aucun ne se perd). */
+    async addAttachments(taskId: string, inputs: AttachmentInput[]) {
+      const { done, errors } = await uploadAll(inputs, taskId, 'pieces-jointes');
+      const current = snapRef.current.tasks.find((x) => x.id === taskId);
+      if (current && done.length) await actions.patchTask(current, { attachments: [...current.attachments, ...done] });
+      if (errors.length) throw new Error(errors.join(' · '));
     },
 
     removeAttachment(t: Task, id: string) {
-      return actions.patchTask(t, { attachments: t.attachments.filter((a) => a.id !== id) });
+      const current = snapRef.current.tasks.find((x) => x.id === t.id) ?? t;
+      return actions.patchTask(current, { attachments: current.attachments.filter((a) => a.id !== id) });
     },
 
     openAttachment: (a: Attachment) => (a.path ? backend.fileUrl(a.path, a.url, a.bucket ?? 'pieces-jointes') : Promise.resolve(a.url)),
@@ -373,6 +399,16 @@ function useStoreValue() {
         },
         okText,
       );
+    },
+
+    async setAvatar(file: File) {
+      const { squareAvatar } = await import('../lib/image');
+      const url = await backend.uploadAvatar(await squareAvatar(file), me!.id);
+      await actions.updateProfile(me!.id, { avatar_url: url }, 'Photo mise à jour');
+    },
+
+    removeAvatar() {
+      return actions.updateProfile(me!.id, { avatar_url: null }, 'Photo retirée');
     },
 
     async inviteMember(m: NewMember) {
@@ -489,7 +525,7 @@ function useStoreValue() {
     },
 
     // ---------- Documents ----------
-    async saveDoc(d: Partial<Doc> & { title: string }) {
+    async saveDoc(d: Partial<Doc> & { title: string }, quiet = false) {
       const existing = d.id ? snap.docs.find((x) => x.id === d.id) : undefined;
       if (existing) {
         const patch = { ...d, updated_by: me!.id, updated_at: now() };
@@ -500,7 +536,7 @@ function useStoreValue() {
         id: uid(), category: 'Autre', content: '', attachments: [], admins_only: false, pinned: false,
         author_id: me!.id, updated_by: me!.id, created_at: now(), updated_at: now(), ...d,
       } as Doc;
-      await run((st) => ({ ...st, docs: [row, ...st.docs] }), () => backend.insert('docs', row), 'Document créé');
+      await run((st) => ({ ...st, docs: [row, ...st.docs] }), () => backend.insert('docs', row), quiet ? undefined : 'Document créé');
       return row.id;
     },
 
@@ -508,15 +544,35 @@ function useStoreValue() {
       return run((st) => ({ ...st, docs: st.docs.filter((d) => d.id !== id) }), () => backend.remove('docs', id), 'Document supprimé');
     },
 
-    async addDocAttachment(d: Doc, input: { file?: File; name?: string; url?: string }) {
-      const att = await makeAttachment(input, d.id, 'documents');
-      const current = snap.docs.find((x) => x.id === d.id) ?? d;
-      const patch = { attachments: [...current.attachments, att], updated_by: me!.id, updated_at: now() };
-      await run((st) => ({ ...st, docs: st.docs.map((x) => (x.id === d.id ? { ...x, ...patch } : x)) }), () => backend.update('docs', d.id, patch));
+    async addDocAttachments(docId: string, inputs: AttachmentInput[]) {
+      const { done, errors } = await uploadAll(inputs, docId, 'documents');
+      const current = snapRef.current.docs.find((x) => x.id === docId);
+      if (current && done.length) {
+        const patch = { attachments: [...current.attachments, ...done], updated_by: me!.id, updated_at: now() };
+        await run((st) => ({ ...st, docs: st.docs.map((x) => (x.id === docId ? { ...x, ...patch } : x)) }), () => backend.update('docs', docId, patch));
+      }
+      if (errors.length) throw new Error(errors.join(' · '));
+    },
+
+    /** Un document par fichier importé (titre = nom du fichier), prêt à être complété. */
+    async importDocs(files: File[], opts: { category: string; admins_only: boolean }) {
+      const errors: string[] = [];
+      let created = 0;
+      let firstId: string | null = null;
+      for (const file of files) {
+        const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim() || file.name;
+        const id = await actions.saveDoc({ title, category: opts.category, admins_only: opts.admins_only, content: '' }, true);
+        try { await actions.addDocAttachments(id, [{ file }]); created++; firstId ??= id; }
+        catch (e) { errors.push(`${file.name} : ${(e as Error).message}`); await actions.deleteDoc(id); }
+      }
+      if (errors.length) toast(errors.join(' · '), 'erreur');
+      if (created) toast(created > 1 ? `${created} documents importés` : 'Document importé');
+      return firstId;
     },
 
     removeDocAttachment(d: Doc, attId: string) {
-      const patch = { attachments: d.attachments.filter((a) => a.id !== attId) };
+      const current = snapRef.current.docs.find((x) => x.id === d.id) ?? d;
+      const patch = { attachments: current.attachments.filter((a) => a.id !== attId) };
       return run((st) => ({ ...st, docs: st.docs.map((x) => (x.id === d.id ? { ...x, ...patch } : x)) }), () => backend.update('docs', d.id, patch));
     },
 

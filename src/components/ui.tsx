@@ -61,6 +61,17 @@ export function Badge({ tone = 'neutre', children, className = '' }: { tone?: To
 
 export function Avatar({ p, size = 32, ring = false }: { p?: Profile; size?: number; ring?: boolean }) {
   if (!p) return <span className="inline-grid shrink-0 place-items-center rounded-full bg-mab-rail text-mab-gris" style={{ width: size, height: size, fontSize: size * 0.34 }}>?</span>;
+  if (p.avatar_url) {
+    return (
+      <img
+        src={p.avatar_url}
+        alt={p.full_name}
+        title={`${p.full_name} · ${p.job_title}`}
+        className={`inline-block shrink-0 rounded-full bg-mab-rail object-cover ${ring ? 'ring-2 ring-white' : ''} ${p.active ? '' : 'opacity-40'}`}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
   return (
     <span
       title={`${p.full_name} · ${p.job_title}`}

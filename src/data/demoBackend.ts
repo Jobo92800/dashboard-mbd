@@ -29,7 +29,7 @@ function normalize(raw: Partial<Snapshot>): Snapshot {
   s.messages = s.messages.map((m) => ({ ...m, reply_to: m.reply_to ?? null, attachments: m.attachments ?? [], edited_at: m.edited_at ?? null }));
   s.conversations = s.conversations.map((c) => ({ ...c, pinned_ids: c.pinned_ids ?? [] }));
   s.tasks = s.tasks.map((t) => ({ ...t, checklist: t.checklist ?? [], attachments: t.attachments ?? [], recurrence: t.recurrence ?? null }));
-  s.profiles = s.profiles.map((p) => ({ ...p, recap_email: p.recap_email ?? true }));
+  s.profiles = s.profiles.map((p) => ({ ...p, recap_email: p.recap_email ?? true, avatar_url: p.avatar_url ?? null }));
   return s;
 }
 
@@ -108,6 +108,15 @@ export const demoBackend: Backend = {
     return { path: '', url };
   },
 
+  async uploadAvatar(image) {
+    return new Promise<string>((ok, ko) => {
+      const r = new FileReader();
+      r.onload = () => ok(r.result as string);
+      r.onerror = () => ko(new Error('Lecture de l’image impossible.'));
+      r.readAsDataURL(image);
+    });
+  },
+
   async fileUrl(_path, fallback) {
     return fallback;
   },
@@ -148,7 +157,7 @@ export const demoBackend: Backend = {
     }
     s.profiles.push({
       id: uid(), ...m, email: m.email.trim().toLowerCase(), active: true,
-      availability: 'disponible', availability_note: '', recap_email: true,
+      availability: 'disponible', availability_note: '', recap_email: true, avatar_url: null,
     });
     write(s);
     return { tempPassword: DEMO_PASSWORD };

@@ -91,11 +91,19 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
     },
 
     async uploadFile(file, folder, bucket = 'pieces-jointes') {
-      if (file.size > 20 * 1024 * 1024) throw new Error('Fichier trop lourd (20 Mo maximum).');
+      const max = bucket === 'documents' ? 50 : 20;
+      if (file.size > max * 1024 * 1024) throw new Error(`Fichier trop lourd (${max} Mo maximum).`);
       const safe = file.name.normalize('NFD').replace(/[^\w.-]+/g, '_');
       const path = `${folder}/${Date.now()}-${safe}`;
       check((await sb.storage.from(bucket).upload(path, file, { contentType: file.type })).error);
       return { path, url: '' };
+    },
+
+    async uploadAvatar(image, userId) {
+      // Nouveau nom à chaque fois : l'ancienne photo ne reste pas en cache chez les autres.
+      const path = `${userId}/${Date.now()}.jpg`;
+      check((await sb.storage.from('avatars').upload(path, image, { contentType: 'image/jpeg', upsert: true })).error);
+      return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl;
     },
 
     async fileUrl(path, _fallback, bucket = 'pieces-jointes') {

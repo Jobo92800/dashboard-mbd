@@ -8,6 +8,7 @@ import { isLate } from '../lib/selectors';
 import { resetDemo } from '../data/demoBackend';
 import { AvailDot, Avatar, IconButton } from './ui';
 import { SearchPalette } from './SearchPalette';
+import { NameSetup } from './NameSetup';
 import { useToast } from '../state/toast';
 import { setAppBadge, showSystemNotification, useInstall } from '../lib/device';
 import { playSound } from '../lib/sounds';
@@ -135,6 +136,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </div>
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <MessageWatcher />
+      <NameSetup />
     </div>
   );
 }
