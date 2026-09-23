@@ -48,7 +48,41 @@ export default function Admin() {
         </Card>
       </div>
 
-      <Card className="overflow-x-auto">
+      {/* Téléphone : une carte par personne */}
+      <div className="grid gap-3 sm:hidden">
+        {[...snap.profiles].sort((a, b) => Number(b.active) - Number(a.active) || a.full_name.localeCompare(b.full_name)).map((p) => {
+          const self = p.id === me!.id;
+          const lastAdmin = p.role === 'admin' && admins <= 1;
+          return (
+            <Card key={p.id} className={`p-4 ${p.active ? '' : 'bg-mab-wash'}`}>
+              <div className="flex items-center gap-3">
+                <Avatar p={p} size={40} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{p.full_name}{self && ' (toi)'}</p>
+                  <p className="truncate text-xs text-mab-texte">{p.email}</p>
+                </div>
+                {p.active ? <Badge tone="succes">Actif</Badge> : <Badge>Désactivé</Badge>}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <select
+                  value={p.role}
+                  disabled={self || lastAdmin || !p.active}
+                  onChange={(e) => updateProfile(p.id, { role: e.target.value as Role }, 'Rôle mis à jour')}
+                  className="h-10 flex-1 rounded-mab-pilule border border-mab-filet bg-white px-3 text-sm disabled:opacity-50"
+                  aria-label={`Rôle de ${p.full_name}`}
+                >
+                  <option value="admin">Administrateur</option>
+                  <option value="membre">Membre</option>
+                </select>
+                <Button variant="discret" onClick={() => setEditing(p)}>Modifier</Button>
+                {!self && <Button variant="discret" className={p.active ? '!text-mab-erreur' : ''} onClick={() => toggleActive(p)}>{p.active ? 'Désactiver' : 'Réactiver'}</Button>}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card className="overflow-x-auto max-sm:hidden">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-mab-filet text-left text-xs text-mab-texte">

@@ -33,7 +33,7 @@ export function EventModal({ draft, onClose }: { draft: Partial<CalEvent> | null
         <>
           {isEdit && (
             <Button variant="danger" className="mr-auto" onClick={() => { onClose(); deleteEvent(draft as CalEvent); }}>
-              <Trash2 size={16} /> Supprimer
+              <Trash2 size={16} /><span className="max-sm:hidden"> Supprimer</span>
             </Button>
           )}
           <Button variant="tertiaire" onClick={onClose}>Annuler</Button>
@@ -45,7 +45,7 @@ export function EventModal({ draft, onClose }: { draft: Partial<CalEvent> | null
         <Field label="Titre">
           <Input autoFocus value={e.title ?? ''} onChange={(x) => set({ title: x.target.value })} placeholder="Ex. Point hebdo direction" />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <Field label="Type">
             <Select value={e.kind} onChange={(x) => set({ kind: x.target.value })}>
               {EVENT_TYPES.map((k) => <option key={k}>{k}</option>)}

@@ -42,7 +42,7 @@ export function Layout({ children }: { children: ReactNode }) {
   ];
 
   const sidebar = (
-    <nav className="flex h-full flex-col gap-1 bg-mab-degrade-profond px-4 py-5 text-white">
+    <nav className="flex h-full flex-col gap-1 overflow-y-auto bg-mab-degrade-profond px-4 py-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white">
       <Link to="/" className="mb-6 flex items-center gap-3 px-2">
         <img src="/mabeautyplus-lotus.svg" alt="" className="h-9 w-9 rounded-mab-etiquette bg-white p-1" />
         <span>
@@ -106,12 +106,13 @@ export function Layout({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-screen lg:block">{sidebar}</aside>
       {menuOpen && (
         <div className="fixed inset-0 z-40 bg-mab-encre/40 lg:hidden" onClick={() => setMenuOpen(false)}>
-          <div className="h-full w-[270px]" onClick={(e) => e.stopPropagation()}>{sidebar}</div>
+          <div className="h-full w-[min(290px,85vw)] shadow-mab-profonde" onClick={(e) => e.stopPropagation()}>{sidebar}</div>
         </div>
       )}
       <div className="min-w-0">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-mab-filet bg-white/90 px-4 backdrop-blur sm:px-8">
-          <IconButton label="Ouvrir le menu" className="lg:hidden" onClick={() => setMenuOpen(true)}><Menu size={20} /></IconButton>
+        <header className="pt-safe sticky top-0 z-30 border-b border-mab-filet bg-white/90 backdrop-blur">
+          <div className="flex h-16 items-center gap-2 px-4 sm:px-8">
+          <Link to="/" className="shrink-0 lg:hidden" aria-label="Ma journée"><img src="/mabeautyplus-lotus.svg" alt="" className="h-8 w-8" /></Link>
           <button
             onClick={() => setSearchOpen(true)}
             className="flex h-10 flex-1 items-center gap-2 rounded-mab-pilule border border-mab-filet bg-mab-wash px-4 text-left text-sm text-mab-gris-doux transition hover:border-mab-filet-aqua sm:max-w-md"
@@ -120,20 +121,22 @@ export function Layout({ children }: { children: ReactNode }) {
             <kbd className="hidden rounded-mab-puce border border-mab-filet bg-white px-1.5 text-[11px] sm:inline">⌘K</kbd>
           </button>
           <div className="ml-auto flex items-center gap-1">
-            <Link to="/messages" aria-label="Messages" className="relative grid h-9 w-9 place-items-center rounded-mab-pilule text-mab-texte hover:bg-mab-wash-2 hover:text-mab-aqua-texte">
+            <Link to="/messages" aria-label="Messages" className="relative hidden h-9 w-9 place-items-center lg:grid rounded-mab-pilule text-mab-texte hover:bg-mab-wash-2 hover:text-mab-aqua-texte">
               <MessagesSquare size={19} />
               {unreadMessages > 0 && <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-mab-rose px-1 text-[10px] font-bold text-white">{unreadMessages}</span>}
             </Link>
             <Notifications />
             <Link to="/profil" className="rounded-full lg:hidden" aria-label="Mon profil"><Avatar p={me} size={34} /></Link>
           </div>
+          </div>
         </header>
-        <main className="mx-auto max-w-[1280px] px-4 pb-16 pt-6 sm:px-8 sm:pt-8">
+        <main className="mx-auto max-w-[1280px] px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-8 sm:pt-8 lg:pb-16">
           {loaded ? children : (
             <div className="grid h-[50vh] place-items-center"><img src="/mabeautyplus-lotus.svg" alt="Chargement" className="h-10 w-10 animate-pulse" /></div>
           )}
         </main>
       </div>
+      <MobileNav onMore={() => setMenuOpen(true)} />
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <MessageWatcher />
       <NameSetup />
@@ -186,6 +189,49 @@ function MessageWatcher() {
   const unreadNotifs = snap.notifications.filter((n) => !n.read).length;
   useEffect(() => { setAppBadge(unreadMessages + unreadNotifs); }, [unreadMessages, unreadNotifs]);
   return null;
+}
+
+/** Barre d'onglets du téléphone (masquée dans une conversation, comme WhatsApp). */
+function MobileNav({ onMore }: { onMore: () => void }) {
+  const { me, snap, unreadMessages, unreadAnnouncements } = useStore();
+  const loc = useLocation();
+  if (!me || /^\/messages\/[^/]+/.test(loc.pathname)) return null;
+  const late = snap.tasks.filter((t) => t.assignee_id === me.id && isLate(t)).length;
+  const more = unreadAnnouncements.length + (me.role === 'admin' ? snap.absences.filter((a) => a.status === 'en_attente').length : 0);
+  const items = [
+    { to: '/', label: 'Journée', icon: Sun, count: late },
+    { to: '/taches', label: 'Tâches', icon: ListChecks },
+    { to: '/messages', label: 'Messages', icon: MessagesSquare, count: unreadMessages },
+    { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+  ];
+  const Badge = ({ n }: { n?: number }) => (n ? <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-mab-rose px-1 text-[10px] font-bold text-white">{n > 99 ? '99+' : n}</span> : null);
+  return (
+    <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-mab-filet bg-white/95 backdrop-blur lg:hidden" aria-label="Navigation principale">
+      <div className="mx-auto grid h-16 max-w-lg grid-cols-5">
+        {items.map((it) => (
+          <NavLink
+            key={it.to}
+            to={it.to}
+            end={it.to === '/'}
+            className={({ isActive }) => `flex flex-col items-center justify-center gap-1 text-[11px] font-medium ${isActive ? 'text-mab-aqua-texte' : 'text-mab-gris'}`}
+          >
+            {({ isActive }) => (
+              <>
+                <span className={`relative grid h-7 w-12 place-items-center rounded-mab-pilule transition ${isActive ? 'bg-mab-wash-2' : ''}`}>
+                  <it.icon size={20} /><Badge n={it.count} />
+                </span>
+                {it.label}
+              </>
+            )}
+          </NavLink>
+        ))}
+        <button onClick={onMore} className="flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-mab-gris">
+          <span className="relative grid h-7 w-12 place-items-center"><Menu size={20} /><Badge n={more} /></span>
+          Plus
+        </button>
+      </div>
+    </nav>
+  );
 }
 
 function InstallHint() {

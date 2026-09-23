@@ -12,3 +12,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 button, input, select, textarea { font: inherit; }
+
+/* ---------- Mobile ---------- */
+
+/* Un élément de grille peut rétrécir : plus aucun débordement horizontal. */
+.grid > * { min-width: 0; }
+
+html { -webkit-tap-highlight-color: transparent; }
+
+/* Sur iPhone, un champ en dessous de 16 px déclenche un zoom automatique. */
+@media (max-width: 1023px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea { font-size: 16px !important; }
+}
+
+/* Écrans tactiles : les actions habituellement révélées au survol restent visibles. */
+@media (hover: none) {
+  .hover-reveal { opacity: 1 !important; }
+}
+
+/* Encoche et barre d'accueil de l'iPhone (appli installée). */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }

@@ -58,7 +58,7 @@ export default function Projects() {
           <option value="">Toute l’équipe</option>
           {snap.profiles.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
         </select>
-        <div className="ml-auto inline-flex rounded-mab-pilule border border-mab-filet bg-white p-1">
+        <div className="inline-flex rounded-mab-pilule border border-mab-filet bg-white p-1 sm:ml-auto">
           <button aria-pressed={view === 'cartes'} onClick={() => setView('cartes')} className={`flex items-center gap-1.5 rounded-mab-pilule px-3 py-1.5 text-sm ${view === 'cartes' ? 'bg-mab-wash-2 font-semibold text-mab-aqua-texte' : 'text-mab-texte'}`}><LayoutGrid size={15} /> Cartes</button>
           <button aria-pressed={view === 'chronologie'} onClick={() => setView('chronologie')} className={`flex items-center gap-1.5 rounded-mab-pilule px-3 py-1.5 text-sm ${view === 'chronologie' ? 'bg-mab-wash-2 font-semibold text-mab-aqua-texte' : 'text-mab-texte'}`}><CalendarRange size={15} /> Chronologie</button>
         </div>
@@ -160,7 +160,25 @@ function WhoDoesWhat() {
   return (
     <section className="mt-10">
       <h2 className="mb-3 text-xl font-light">Qui travaille <b className="font-semibold">sur quoi</b></h2>
-      <Card className="overflow-x-auto">
+      <div className="grid gap-3 sm:hidden">
+        {rows.map((r) => (
+          <Card key={r.person.id} className="p-4">
+            <Link to={`/equipe?personne=${r.person.id}`} className="flex items-center gap-3">
+              <Avatar p={r.person} size={36} />
+              <span className="min-w-0 flex-1"><b className="block font-semibold">{r.person.full_name}</b><span className="block truncate text-xs text-mab-texte">{r.person.job_title}</span></span>
+              <span className="text-right text-xs text-mab-texte"><b className="block text-base text-mab-encre">{r.open}</b>ouvertes</span>
+            </Link>
+            {r.late > 0 && <p className="mt-2 text-xs font-semibold text-mab-erreur">{r.late} en retard</p>}
+            {r.next && <p className="mt-2 text-xs text-mab-texte">Prochaine : <span className="text-mab-encre">{r.next.title}</span> · {fmtShort(r.next.due_date)}</p>}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {r.projects.map((p) => (
+                <Link key={p.id} to={`/projets/${p.id}`} className="inline-flex items-center gap-1.5 rounded-mab-pilule bg-mab-wash px-2.5 py-1 text-xs"><span className="h-2 w-2 rounded-full" style={{ background: p.color }} />{p.name}</Link>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+      <Card className="overflow-x-auto max-sm:hidden">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-mab-filet text-left text-xs text-mab-texte">

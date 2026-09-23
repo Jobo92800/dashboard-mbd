@@ -61,7 +61,7 @@ export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose
         <>
           {isEdit && canDeleteTask(me, draft as Task, snap.projects) && (
             <Button variant="danger" className="mr-auto" onClick={() => { if (confirm('Supprimer cette tâche ?')) { onClose(); deleteTask(draft as Task); } }}>
-              <Trash2 size={16} /> Supprimer
+              <Trash2 size={16} /><span className="max-sm:hidden"> Supprimer</span>
             </Button>
           )}
           <Button variant="tertiaire" onClick={onClose}>{editable ? 'Annuler' : 'Fermer'}</Button>
@@ -79,7 +79,7 @@ export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose
             aria-label="Titre de la tâche"
             className="!h-12 !text-lg !font-medium"
           />
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 sm:gap-x-4">
             <Field label="Responsable">
               <Select value={t.assignee_id ?? ''} onChange={(e) => set({ assignee_id: e.target.value || null })}>
                 <option value="">Personne</option>

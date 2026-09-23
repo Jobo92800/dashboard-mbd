@@ -11,7 +11,7 @@ import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { ProjectModal } from '../components/ProjectModal';
 import { DuplicateModal, SaveTemplateModal } from '../components/TemplateModals';
 import { Comments } from '../components/Comments';
-import { Avatar, AvatarStack, Badge, Button, Card, Empty, Progress, Surtitre, Tabs } from '../components/ui';
+import { ActionMenu, Avatar, AvatarStack, Badge, Button, Card, Empty, Progress, Surtitre, Tabs } from '../components/ui';
 
 type View = 'roadmap' | 'tableau' | 'liste';
 
@@ -58,7 +58,7 @@ export default function ProjectDetail() {
     <>
       <button onClick={() => nav('/projets')} className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-mab-aqua-texte hover:underline"><ArrowLeft size={16} /> Tous les projets</button>
 
-      <Card className="relative mb-6 overflow-hidden p-6">
+      <Card className="relative mb-6 overflow-hidden p-5 sm:p-6">
         <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: project.color }} />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 max-w-3xl">
@@ -67,22 +67,21 @@ export default function ProjectDetail() {
               <span className="text-sm text-mab-texte">{fmtShort(project.start_date)} → {fmtShort(project.end_date)}</span>
               {left !== null && project.status === 'en_cours' && <span className={`text-sm ${left < 0 ? 'font-semibold text-mab-erreur' : 'text-mab-texte'}`}>· {left < 0 ? `dépassé de ${-left} j` : `J-${left}`}</span>}
             </div>
-            <h1 className="mt-2 text-[30px] font-light leading-tight tracking-tight text-mab-encre">{project.name}</h1>
+            <h1 className="mt-2 text-[26px] font-light leading-tight tracking-tight text-mab-encre sm:text-[30px]">{project.name}</h1>
             {project.description && <p className="mt-2 text-[15px] text-mab-texte">{project.description}</p>}
           </div>
           {admin && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button onClick={() => setEditing(true)}><Pencil size={15} /> Modifier</Button>
-              <Button variant="discret" onClick={() => setDup(true)}><Copy size={15} /> Dupliquer</Button>
-              <Button variant="discret" onClick={() => setAsTpl(true)}><LayoutTemplate size={15} /> En faire un modèle</Button>
               {project.status === 'en_cours' && pr.total > 0 && pr.done === pr.total && (
                 <Button onClick={() => saveProject({ ...project, status: 'termine' })}><CheckCheck size={15} /> Clôturer</Button>
               )}
-              {project.status !== 'archive' ? (
-                <Button variant="discret" onClick={() => saveProject({ ...project, status: 'archive' })}><Archive size={15} /> Archiver</Button>
-              ) : (
-                <Button variant="danger" onClick={() => { if (confirm(`Supprimer définitivement « ${project.name} » et toutes ses tâches ?`)) { deleteProject(project); nav('/projets'); } }}><Trash2 size={15} /> Supprimer</Button>
-              )}
+              <ActionMenu actions={[
+                { label: 'Dupliquer', icon: Copy, onClick: () => setDup(true) },
+                { label: 'En faire un modèle', icon: LayoutTemplate, onClick: () => setAsTpl(true) },
+                { label: 'Archiver', icon: Archive, onClick: () => saveProject({ ...project, status: 'archive' }), hidden: project.status === 'archive' },
+                { label: 'Supprimer définitivement', icon: Trash2, danger: true, hidden: project.status !== 'archive', onClick: () => { if (confirm(`Supprimer définitivement « ${project.name} » et toutes ses tâches ?`)) { deleteProject(project); nav('/projets'); } } },
+              ]} />
             </div>
           )}
         </div>
@@ -101,7 +100,7 @@ export default function ProjectDetail() {
               {project.member_ids.map((x) => byId.get(x)).filter(Boolean).map((p) => <option key={p!.id} value={p!.id}>{p!.full_name}</option>)}
             </select>
             <label className="flex items-center gap-2 text-sm text-mab-texte"><input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} className="accent-mab-aqua" /> Masquer les tâches faites</label>
-            {member && <Button variant="primaire" className="ml-auto" onClick={() => newTask()}><Plus size={17} /> Ajouter une tâche</Button>}
+            {member && <Button variant="primaire" className="max-sm:w-full sm:ml-auto" onClick={() => newTask()}><Plus size={17} /> Ajouter une tâche</Button>}
           </div>
 
           {view === 'roadmap' && (
@@ -227,6 +226,17 @@ function Kanban({ tasks, onEdit, canEdit }: { tasks: Task[]; onEdit: (t: Task) =
                     <span onClick={(e) => e.stopPropagation()}><StatusCheck task={t} disabled={!canEdit} /></span>
                     <p className={`flex-1 text-sm ${isDone(t) ? 'text-mab-gris-doux line-through' : ''}`}>{t.title}</p>
                   </div>
+                  {canEdit && (
+                    <select
+                      aria-label="Changer le statut"
+                      value={t.status}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setTaskStatus(t, e.target.value as TaskStatus)}
+                      className="mt-2 h-9 w-full rounded-mab-champ border border-mab-filet bg-mab-wash px-2 text-sm [@media(hover:hover)]:hidden"
+                    >
+                      {COLS.map((c2) => <option key={c2.id} value={c2.id}>{c2.label}</option>)}
+                    </select>
+                  )}
                   <div className="mt-2 flex items-center justify-between text-xs text-mab-texte">
                     <span className="flex items-center gap-2.5"><span className={isLate(t) ? 'font-semibold text-mab-erreur' : ''}>{fmtShort(t.due_date)}</span><TaskMeta task={t} /></span>
                     <Avatar p={byId.get(t.assignee_id ?? '')} size={22} />

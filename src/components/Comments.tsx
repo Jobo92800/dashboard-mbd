@@ -60,7 +60,7 @@ export function Discussion({ items, people, onSend, onDelete, empty, compact = f
                 <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px] text-mab-encre">{render(c.body)}</p>
               </div>
               {(c.author_id === me!.id || isAdmin(me)) && (
-                <IconButton label="Supprimer le message" className="opacity-0 group-hover:opacity-100" onClick={() => confirm('Supprimer ce message ?') && onDelete(c.id)}>
+                <IconButton label="Supprimer le message" className="hover-reveal opacity-0 group-hover:opacity-100" onClick={() => confirm('Supprimer ce message ?') && onDelete(c.id)}>
                   <Trash2 size={14} />
                 </IconButton>
               )}

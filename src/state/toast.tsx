@@ -13,11 +13,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={push}>
       {children}
-      <div className="fixed bottom-5 left-1/2 z-[100] flex -translate-x-1/2 flex-col items-center gap-2" aria-live="polite">
+      <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-1/2 z-[100] flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col items-center gap-2 lg:bottom-5" aria-live="polite">
         {items.map((t) => (
           <div
             key={t.id}
-            className={`rounded-mab-pilule px-5 py-3 text-sm font-medium text-white shadow-mab-flottante ${
+            className={`rounded-mab-pilule px-5 py-3 text-center text-sm font-medium text-white shadow-mab-flottante ${
               t.tone === 'erreur' ? 'bg-mab-erreur' : 'bg-mab-aqua-encre'
             }`}
           >

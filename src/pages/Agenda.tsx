@@ -52,24 +52,24 @@ export default function Agenda() {
   return (
     <>
       <PageTitle title={<>Agenda & <b>échéances</b></>} sub="Deadlines des projets, tâches rapides et réunions de l’équipe.">
-        <Button onClick={exportIcs} title="Télécharger mes événements pour Google Agenda / iPhone"><Download size={16} /> Exporter (.ics)</Button>
+        <Button onClick={exportIcs} title="Télécharger mes événements pour Google Agenda / iPhone" className="max-sm:!px-4"><Download size={16} /><span className="max-sm:hidden"> Exporter (.ics)</span></Button>
         <Button variant="primaire" onClick={() => setEventDraft({ date: day })}><CalendarPlus size={17} /> Nouvel événement</Button>
       </PageTitle>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <Card className="p-4 sm:p-5">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-3">
             <IconButton label="Mois précédent" onClick={() => setCursor((c) => addMonths(c, -1))}><ChevronLeft size={18} /></IconButton>
-            <h2 className="min-w-[160px] text-center text-lg font-semibold capitalize">{format(cursor, 'MMMM yyyy', { locale: fr })}</h2>
+            <h2 className="min-w-[140px] text-center text-lg font-semibold capitalize">{format(cursor, 'MMMM yyyy', { locale: fr })}</h2>
             <IconButton label="Mois suivant" onClick={() => setCursor((c) => addMonths(c, 1))}><ChevronRight size={18} /></IconButton>
             <Button variant="discret" onClick={() => { setCursor(startOfMonth(new Date())); setDay(todayIso()); }}>Aujourd’hui</Button>
-            <select value={person} onChange={(e) => setPerson(e.target.value)} className="ml-auto h-10 rounded-mab-pilule border border-mab-filet bg-white px-4 text-sm">
+            <select value={person} onChange={(e) => setPerson(e.target.value)} className="h-10 rounded-mab-pilule border border-mab-filet bg-white px-4 text-sm max-sm:w-full sm:ml-auto">
               <option value="">Toute l’équipe</option>
               {snap.profiles.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-7 gap-px overflow-hidden rounded-mab-champ border border-mab-filet bg-mab-filet">
-            {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((d) => <div key={d} className="bg-mab-wash py-2 text-center text-xs font-semibold text-mab-texte">{d}</div>)}
+            {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((d) => <div key={d} className="bg-mab-wash py-2 text-center text-xs font-semibold text-mab-texte"><span className="sm:hidden">{d[0]}</span><span className="max-sm:hidden">{d}</span></div>)}
             {days.map((d) => {
               const iso = toIso(d);
               const dt = tasks.filter((t) => t.due_date === iso);
@@ -82,24 +82,30 @@ export default function Agenda() {
                   key={iso}
                   onClick={() => setDay(iso)}
                   onDoubleClick={() => setEventDraft({ date: iso })}
-                  className={`flex min-h-[74px] flex-col items-stretch gap-1 bg-white p-1.5 text-left transition sm:min-h-[96px] ${isSameMonth(d, cursor) ? '' : 'bg-mab-wash/60 text-mab-gris-doux'} ${selected ? '!bg-mab-wash-2 ring-2 ring-inset ring-mab-aqua' : 'hover:bg-mab-wash'}`}
+                  className={`flex min-h-[58px] flex-col items-center gap-1 bg-white p-1 text-left transition sm:min-h-[96px] sm:items-stretch sm:p-1.5 ${isSameMonth(d, cursor) ? '' : 'bg-mab-wash/60 text-mab-gris-doux'} ${selected ? '!bg-mab-wash-2 ring-2 ring-inset ring-mab-aqua' : 'hover:bg-mab-wash'}`}
                 >
                   <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? 'bg-mab-aqua-encre text-white' : ''}`}>{format(d, 'd')}</span>
                   {absentOn(iso).length > 0 && (
-                    <span className="truncate text-[10px] text-mab-texte sm:text-[11px]" title={absentOn(iso).map((a) => byId.get(a.user_id)?.full_name).join(', ')}>
+                    <span className="truncate text-[10px] text-mab-texte max-sm:hidden sm:text-[11px]" title={absentOn(iso).map((a) => byId.get(a.user_id)?.full_name).join(', ')}>
                       🌴 {absentOn(iso).map((a) => byId.get(a.user_id)?.full_name.split(' ')[0]).join(', ')}
                     </span>
                   )}
                   {de.slice(0, 2).map((e) => (
-                    <span key={e.id} className="truncate rounded-mab-puce bg-mab-violet-wash px-1 text-[10px] font-medium text-mab-violet-texte sm:text-[11px]">{e.time} {e.title}</span>
+                    <span key={e.id} className="truncate rounded-mab-puce bg-mab-violet-wash px-1 text-[10px] font-medium text-mab-violet-texte max-sm:hidden sm:text-[11px]">{e.time} {e.title}</span>
                   ))}
+                  {(de.length > 0 || absentOn(iso).length > 0) && (
+                    <span className="flex gap-0.5 sm:hidden">
+                      {de.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-mab-violet" />}
+                      {absentOn(iso).length > 0 && <span className="text-[9px] leading-none">🌴</span>}
+                    </span>
+                  )}
                   {dt.length > 0 && (
                     <span className="flex flex-wrap items-center gap-0.5">
                       {dt.slice(0, 6).map((t) => <span key={t.id} className={`h-1.5 w-1.5 rounded-full ${isDone(t) ? 'opacity-30' : ''}`} style={{ background: projectColor(t.project_id) }} />)}
                       <span className={`ml-0.5 text-[10px] ${lateCount ? 'font-semibold text-mab-erreur' : 'text-mab-texte'}`}>{dt.length}</span>
                     </span>
                   )}
-                  {de.length > 2 && <span className="text-[10px] text-mab-texte">+{de.length - 2}</span>}
+                  {de.length > 2 && <span className="text-[10px] text-mab-texte max-sm:hidden">+{de.length - 2}</span>}
                 </button>
               );
             })}

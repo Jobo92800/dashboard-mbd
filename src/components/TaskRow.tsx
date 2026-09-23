@@ -18,7 +18,7 @@ export function StatusCheck({ task, disabled }: { task: Task; disabled?: boolean
       disabled={disabled}
       aria-label={done ? 'Marquer comme à faire' : 'Marquer comme fait'}
       onClick={() => setTaskStatus(task, done ? 'a_faire' : 'fait')}
-      className={`grid h-6 w-6 shrink-0 place-items-center rounded-mab-etiquette border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mab-aqua focus-visible:ring-offset-2 disabled:opacity-40 ${
+      className={`relative grid h-6 w-6 shrink-0 place-items-center rounded-mab-etiquette border-2 transition before:absolute before:-inset-2.5 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mab-aqua focus-visible:ring-offset-2 disabled:opacity-40 ${
         done ? 'border-mab-aqua bg-mab-aqua text-white' : task.status === 'en_cours' ? 'border-mab-violet bg-mab-violet-wash' : 'border-mab-filet-aqua bg-white hover:border-mab-aqua'
       }`}
     >
@@ -77,10 +77,15 @@ export function TaskRow({ task, onEdit, showProject = false, compact = false }: 
           <TaskMeta task={task} />
         </div>
       </div>
-      {!compact && task.priority !== 'Moyenne' && !done && <Badge tone={PRIO_TONE[task.priority]}>{task.priority}</Badge>}
+      {!compact && task.priority !== 'Moyenne' && !done && (
+        <>
+          <Badge tone={PRIO_TONE[task.priority]} className="max-sm:hidden">{task.priority}</Badge>
+          {task.priority === 'Haute' && <span className="h-2 w-2 shrink-0 rounded-full bg-mab-rose sm:hidden" title="Priorité haute" />}
+        </>
+      )}
       <Avatar p={byId.get(task.assignee_id ?? '')} size={28} />
       {onEdit && editable && (
-        <IconButton label="Modifier la tâche" className="opacity-60 group-hover:opacity-100" onClick={() => onEdit(task)}>
+        <IconButton label="Modifier la tâche" className="hidden opacity-60 group-hover:opacity-100 sm:grid" onClick={() => onEdit(task)}>
           <Pencil size={15} />
         </IconButton>
       )}

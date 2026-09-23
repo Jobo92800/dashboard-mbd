@@ -70,7 +70,10 @@ export default function Messages() {
   const current = snap.conversations.find((c) => c.id === id);
 
   return (
-    <div className="-mb-10 grid h-[calc(100dvh-7.5rem)] min-h-[420px] overflow-hidden rounded-mab-carte border border-mab-filet bg-white sm:h-[calc(100dvh-9rem)] grid-cols-[minmax(0,1fr)] lg:grid-cols-[340px_minmax(0,1fr)]">
+    <div
+      className={`grid grid-cols-[minmax(0,1fr)] overflow-hidden bg-white lg:-mb-10 lg:h-[calc(100dvh-9rem)] lg:min-h-[420px] lg:grid-cols-[340px_minmax(0,1fr)] lg:rounded-mab-carte lg:border lg:border-mab-filet
+        max-lg:fixed max-lg:inset-x-0 ${id ? 'max-lg:pt-safe max-lg:inset-y-0 max-lg:z-40' : 'max-lg:top-[calc(4rem+env(safe-area-inset-top))] max-lg:bottom-[calc(4rem+env(safe-area-inset-bottom))] max-lg:z-20'}`}
+    >
       <aside className={`flex min-h-0 flex-col border-mab-filet lg:border-r ${id ? 'hidden lg:flex' : 'flex'}`}>
         <div className="border-b border-mab-filet p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -194,6 +197,9 @@ function Thread({ conv }: { conv: Conversation }) {
   const [dragOver, setDragOver] = useState(false);
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  /** Écran tactile : toucher un message affiche ses actions. */
+  const [touched, setTouched] = useState<string | null>(null);
+  const isTouch = typeof window !== 'undefined' && !window.matchMedia('(hover: hover)').matches;
   const bottom = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -316,7 +322,7 @@ function Thread({ conv }: { conv: Conversation }) {
         onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragOver(true); } }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => { e.preventDefault(); setDragOver(false); setFiles((f) => [...f, ...Array.from(e.dataTransfer.files)]); }}
-        onClick={() => setPicker(null)}
+        onClick={() => { setPicker(null); setTouched(null); }}
       >
         {messages.length === 0 && <p className="py-10 text-center text-sm text-mab-texte">Écris le premier message.</p>}
         {messages.map((m, i) => {
@@ -334,7 +340,10 @@ function Thread({ conv }: { conv: Conversation }) {
           return (
             <Fragment key={m.id}>
               {newDay && <p className="my-4 text-center text-xs font-medium capitalize text-mab-gris">{dayLabel(m.created_at)}</p>}
-              <div id={`msg-${m.id}`} className={`group relative flex items-end gap-2 rounded-mab-champ transition-colors ${mine ? 'justify-end' : ''} ${sameBlock ? 'mt-1' : 'mt-3'} ${flash === m.id ? 'bg-mab-wash-2' : ''}`}>
+              <div
+                id={`msg-${m.id}`}
+                onClick={(e) => { if (isTouch && editingId !== m.id) { e.stopPropagation(); setTouched(touched === m.id ? null : m.id); setPicker(null); } }}
+                className={`group relative flex items-end gap-2 rounded-mab-champ transition-colors ${mine ? 'justify-end' : ''} ${sameBlock ? 'mt-1' : 'mt-3'} ${flash === m.id ? 'bg-mab-wash-2' : ''}`}>
                 {!mine && <span className="w-8 shrink-0">{!sameBlock && <Avatar p={author} size={32} />}</span>}
                 <div className={`flex max-w-[78%] flex-col sm:max-w-[65%] ${mine ? 'items-end' : 'items-start'}`}>
                   {!mine && group && !sameBlock && <span className="mb-1 ml-1 text-xs font-medium text-mab-texte">{author?.full_name}</span>}
@@ -414,14 +423,14 @@ function Thread({ conv }: { conv: Conversation }) {
                 {editingId !== m.id && (
                   <div
                     onClick={(e) => e.stopPropagation()}
-                    className={`absolute -top-4 z-10 hidden items-center gap-0.5 rounded-mab-pilule border border-mab-filet bg-white p-0.5 shadow-mab-carte group-hover:flex ${picker === m.id ? '!flex' : ''} ${mine ? 'right-2' : 'left-12'}`}
+                    className={`absolute -top-4 z-10 hidden items-center gap-0.5 rounded-mab-pilule border border-mab-filet bg-white p-0.5 shadow-mab-carte [@media(hover:hover)]:group-hover:flex ${picker === m.id || touched === m.id ? '!flex' : ''} ${mine ? 'right-2' : 'left-12'} max-sm:-top-9 max-sm:left-auto max-sm:right-2`}
                   >
-                    <IconButton label="Réagir" className="!h-7 !w-7" onClick={() => setPicker(picker === m.id ? null : m.id)}><SmilePlus size={15} /></IconButton>
-                    <IconButton label="Répondre" className="!h-7 !w-7" onClick={() => setReplyTo(m)}><Reply size={15} /></IconButton>
-                    <IconButton label={isPinned ? 'Désépingler' : 'Épingler'} className="!h-7 !w-7" onClick={() => togglePin(conv, m.id)}><Pin size={15} /></IconButton>
-                    <IconButton label="Transformer en tâche" className="!h-7 !w-7" onClick={() => toTask(m)}><ListPlus size={15} /></IconButton>
-                    {mine && <IconButton label="Modifier" className="!h-7 !w-7" onClick={() => { setEditingId(m.id); setEditText(m.body); }}><Pencil size={14} /></IconButton>}
-                    {mine && <IconButton label="Supprimer" className="!h-7 !w-7 hover:!text-mab-erreur" onClick={() => confirm('Supprimer ce message pour tout le monde ?') && deleteMessage(m.id)}><Trash2 size={14} /></IconButton>}
+                    <IconButton label="Réagir" className="!h-7 !w-7 [@media(hover:none)]:!h-9 [@media(hover:none)]:!w-9" onClick={() => setPicker(picker === m.id ? null : m.id)}><SmilePlus size={15} /></IconButton>
+                    <IconButton label="Répondre" className="!h-7 !w-7 [@media(hover:none)]:!h-9 [@media(hover:none)]:!w-9" onClick={() => { setReplyTo(m); setTouched(null); }}><Reply size={15} /></IconButton>
+                    <IconButton label={isPinned ? 'Désépingler' : 'Épingler'} className="!h-7 !w-7 [@media(hover:none)]:!h-9 [@media(hover:none)]:!w-9" onClick={() => togglePin(conv, m.id)}><Pin size={15} /></IconButton>
+                    <IconButton label="Transformer en tâche" className="!h-7 !w-7 [@media(hover:none)]:!h-9 [@media(hover:none)]:!w-9" onClick={() => toTask(m)}><ListPlus size={15} /></IconButton>
+                    {mine && <IconButton label="Modifier" className="!h-7 !w-7 [@media(hover:none)]:!h-9 [@media(hover:none)]:!w-9" onClick={() => { setEditingId(m.id); setEditText(m.body); }}><Pencil size={14} /></IconButton>}
+                    {mine && <IconButton label="Supprimer" className="!h-7 !w-7 hover:!text-mab-erreur [@media(hover:none)]:!h-9 [@media(hover:none)]:!w-9" onClick={() => confirm('Supprimer ce message pour tout le monde ?') && deleteMessage(m.id)}><Trash2 size={14} /></IconButton>}
                     {picker === m.id && (
                       <div className={`absolute top-9 flex gap-0.5 rounded-mab-pilule border border-mab-filet bg-white p-1 shadow-mab-flottante ${mine ? 'right-0' : 'left-0'}`}>
                         {EMOJIS.map((e) => (
@@ -438,7 +447,7 @@ function Thread({ conv }: { conv: Conversation }) {
         <div ref={bottom} />
       </div>
 
-      <div className="border-t border-mab-filet bg-white">
+      <div className="pb-safe border-t border-mab-filet bg-white">
         {replyTo && (
           <div className="flex items-center gap-2 border-b border-mab-filet bg-mab-wash px-4 py-2 text-sm">
             <Reply size={15} className="shrink-0 text-mab-aqua-texte" />
@@ -497,7 +506,7 @@ function Thread({ conv }: { conv: Conversation }) {
             <Send size={18} className={sending ? 'animate-pulse' : ''} />
           </button>
         </div>
-        <p className="px-4 pb-2 text-[11px] text-mab-gris-doux">Entrée pour envoyer · Maj + Entrée pour aller à la ligne · glisse ou colle un fichier pour le joindre</p>
+        <p className="px-4 pb-2 text-[11px] text-mab-gris-doux max-sm:hidden">Entrée pour envoyer · Maj + Entrée pour aller à la ligne · glisse ou colle un fichier pour le joindre</p>
       </div>
 
       <ConversationInfo open={infoOpen} conv={conv} onClose={() => setInfoOpen(false)} />
@@ -564,6 +573,7 @@ function GroupPhotoPicker({ url, onPick, busy, size = 88 }: { url: string | null
       <span className={`absolute inset-0 grid place-items-center rounded-full bg-mab-encre/45 text-white transition ${busy ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
         <Camera size={20} className={busy ? 'animate-pulse' : ''} />
       </span>
+      <span className="absolute -bottom-0.5 -right-0.5 grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-mab-aqua-encre text-white [@media(hover:hover)]:hidden"><Camera size={13} /></span>
       <input ref={ref} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = ''; }} />
     </button>
   );

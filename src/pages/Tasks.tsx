@@ -10,7 +10,7 @@ import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { Button, Card, Empty, PageTitle, Tabs } from '../components/ui';
 
 type TabId = 'miennes' | 'rapides' | 'retard' | 'toutes';
-const sel = 'h-10 rounded-mab-pilule border border-mab-filet bg-white px-4 text-sm text-mab-encre';
+const sel = 'h-10 rounded-mab-pilule border border-mab-filet bg-white px-4 text-sm text-mab-encre max-sm:min-w-0 max-sm:flex-[1_1_45%]';
 
 export default function Tasks() {
   const { snap, me } = useStore();
@@ -68,7 +68,7 @@ export default function Tasks() {
       </div>
 
       <Card className="mb-4 flex flex-wrap items-center gap-2 p-3">
-        <div className="flex h-10 min-w-[200px] flex-1 items-center gap-2 rounded-mab-pilule border border-mab-filet px-4">
+        <div className="flex h-10 min-w-[200px] flex-1 items-center gap-2 rounded-mab-pilule border border-mab-filet px-4 max-sm:basis-full">
           <Search size={15} className="text-mab-gris" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrer par mot-clé" className="flex-1 bg-transparent text-sm outline-none" />
         </div>

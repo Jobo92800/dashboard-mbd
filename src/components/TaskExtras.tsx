@@ -43,7 +43,7 @@ export function ChecklistEditor({ items, onChange, disabled }: { items: Checklis
             onDragEnd={() => setDrag(null)}
             className={`group flex items-center gap-2 rounded-mab-etiquette px-1 py-1 ${drag === i ? 'bg-mab-wash-2' : 'hover:bg-mab-wash'}`}
           >
-            {!disabled && <GripVertical size={14} className="shrink-0 cursor-grab text-mab-gris-doux opacity-0 group-hover:opacity-100" />}
+            {!disabled && <GripVertical size={14} className="shrink-0 cursor-grab text-mab-gris-doux hover-reveal opacity-0 group-hover:opacity-100" />}
             <input
               type="checkbox"
               checked={it.done}
@@ -60,7 +60,7 @@ export function ChecklistEditor({ items, onChange, disabled }: { items: Checklis
               className={`min-w-0 flex-1 bg-transparent text-[15px] outline-none ${it.done ? 'text-mab-gris-doux line-through' : 'text-mab-encre'}`}
             />
             {!disabled && (
-              <IconButton label="Supprimer la sous-tâche" className="!h-7 !w-7 opacity-0 group-hover:opacity-100" onClick={() => onChange(items.filter((x) => x.id !== it.id))}>
+              <IconButton label="Supprimer la sous-tâche" className="!h-7 !w-7 hover-reveal opacity-0 group-hover:opacity-100" onClick={() => onChange(items.filter((x) => x.id !== it.id))}>
                 <X size={14} />
               </IconButton>
             )}
@@ -162,7 +162,7 @@ export function AttachmentList({ items, onAdd, onRemove, disabled }: {
             <span className="text-xs text-mab-gris-doux">{fmtSize(a.size)}</span>
             <ExternalLink size={14} className="text-mab-gris-doux" />
             {!disabled && (
-              <IconButton label="Retirer" className="!h-7 !w-7 opacity-0 group-hover:opacity-100" onClick={() => confirm(`Retirer « ${a.name} » ?`) && onRemove(a.id)}>
+              <IconButton label="Retirer" className="!h-7 !w-7 hover-reveal opacity-0 group-hover:opacity-100" onClick={() => confirm(`Retirer « ${a.name} » ?`) && onRemove(a.id)}>
                 <Trash2 size={14} />
               </IconButton>
             )}

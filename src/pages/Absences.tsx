@@ -21,7 +21,15 @@ export default function Absences() {
   const admin = isAdmin(me);
   const today = todayIso();
 
-  const days = eachDayOfInterval({ start: week0, end: addDays(addWeeks(week0, 6), -1) }).filter((d) => !isWeekend(d));
+  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 639px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const weeks = narrow ? 2 : 6;
+  const days = eachDayOfInterval({ start: week0, end: addDays(addWeeks(week0, weeks), -1) }).filter((d) => !isWeekend(d));
   const from = toIso(days[0]);
   const to = toIso(days[days.length - 1]);
   const people = snap.profiles.filter((p) => p.active);
@@ -57,13 +65,13 @@ export default function Absences() {
 
       <Card className="mb-6 overflow-x-auto p-4 sm:p-5">
         <div className="mb-3 flex items-center gap-2">
-          <IconButton label="Semaines précédentes" onClick={() => setWeek0((w) => addWeeks(w, -2))}><ChevronLeft size={18} /></IconButton>
+          <IconButton label="Semaines précédentes" onClick={() => setWeek0((w) => addWeeks(w, narrow ? -1 : -2))}><ChevronLeft size={18} /></IconButton>
           <h2 className="font-semibold">Du {format(days[0], 'd MMM', { locale: fr })} au {format(days[days.length - 1], 'd MMM', { locale: fr })}</h2>
-          <IconButton label="Semaines suivantes" onClick={() => setWeek0((w) => addWeeks(w, 2))}><ChevronRight size={18} /></IconButton>
+          <IconButton label="Semaines suivantes" onClick={() => setWeek0((w) => addWeeks(w, narrow ? 1 : 2))}><ChevronRight size={18} /></IconButton>
           <Button variant="discret" onClick={() => setWeek0(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Aujourd’hui</Button>
         </div>
-        <div className="min-w-[760px]">
-          <div className="grid" style={{ gridTemplateColumns: `150px repeat(${days.length}, minmax(0,1fr))` }}>
+        <div className="sm:min-w-[760px]">
+          <div className="grid" style={{ gridTemplateColumns: `${narrow ? 88 : 150}px repeat(${days.length}, minmax(0,1fr))` }}>
             <span />
             {days.map((d) => (
               <span key={d.toISOString()} className={`pb-1 text-center text-[10px] ${toIso(d) === today ? 'font-bold text-mab-aqua-texte' : 'text-mab-gris'} ${d.getDay() === 1 ? 'border-l border-mab-filet' : ''}`}>
@@ -111,7 +119,7 @@ function PersonRow({ name, avatar, days, list, onPick }: { name: string; avatar:
   const { me } = useStore();
   return (
     <>
-      <span className="flex items-center gap-2 border-t border-mab-filet py-1.5 pr-2 text-sm"><span className="shrink-0">{avatar}</span><span className="truncate">{name}</span></span>
+      <span className="flex items-center gap-2 border-t border-mab-filet py-1.5 pr-2 text-sm"><span className="shrink-0">{avatar}</span><span className="truncate">{name.split(' ')[0]}</span></span>
       {days.map((d, i) => {
         const a = list.find((x) => x.start_date <= d && x.end_date >= d);
         const color = a ? KIND_COLOR[absenceKind(a, me)] ?? '#9babab' : undefined;

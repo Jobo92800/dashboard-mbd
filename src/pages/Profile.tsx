@@ -50,6 +50,7 @@ export default function Profile() {
               <span className={`absolute inset-0 grid place-items-center rounded-full bg-mab-encre/45 text-white transition ${uploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                 <Camera size={22} className={uploading ? 'animate-pulse' : ''} />
               </span>
+              <span className="absolute -bottom-0.5 -right-0.5 grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-mab-aqua-encre text-white [@media(hover:hover)]:hidden"><Camera size={13} /></span>
             </button>
             <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => { pickPhoto(e.target.files?.[0]); e.target.value = ''; }} />
             <div className="flex-1">

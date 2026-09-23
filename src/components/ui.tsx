@@ -1,5 +1,5 @@
-import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { MoreHorizontal, X } from 'lucide-react';
 import type { Profile } from '../lib/types';
 import { initials } from '../lib/palette';
 
@@ -23,7 +23,7 @@ export function IconButton({ label, className = '', ...rest }: ButtonHTMLAttribu
       type="button"
       aria-label={label}
       title={label}
-      className={`grid h-9 w-9 place-items-center rounded-mab-pilule text-mab-texte transition hover:bg-mab-wash-2 hover:text-mab-aqua-texte focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mab-aqua ${className}`}
+      className={`grid h-9 w-9 place-items-center rounded-mab-pilule text-mab-texte transition [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:w-10 hover:bg-mab-wash-2 hover:text-mab-aqua-texte focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mab-aqua ${className}`}
       {...rest}
     />
   );
@@ -132,15 +132,16 @@ export function Modal({ open, onClose, title, children, footer, wide = false }: 
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`flex max-h-[92vh] w-full flex-col rounded-t-mab-carte bg-white shadow-mab-flottante sm:rounded-mab-carte ${wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'}`}
+        className={`flex max-h-[92dvh] w-full flex-col rounded-t-[22px] bg-white shadow-mab-flottante sm:max-h-[92vh] sm:rounded-mab-carte ${wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'}`}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-mab-filet px-6 py-4">
+        <span className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-mab-pilule bg-mab-rail sm:hidden" aria-hidden />
+        <div className="flex items-center justify-between border-b border-mab-filet px-5 py-3 sm:px-6 sm:py-4">
           <h2 className="text-lg font-semibold text-mab-encre">{title}</h2>
           <IconButton label="Fermer" onClick={onClose}><X size={18} /></IconButton>
         </div>
-        <div className="overflow-y-auto px-6 py-5">{children}</div>
-        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-mab-filet px-6 py-4">{footer}</div>}
+        <div className={`overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 ${footer ? '' : 'pb-[max(1.25rem,env(safe-area-inset-bottom))]'}`}>{children}</div>
+        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-mab-filet px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">{footer}</div>}
       </div>
     </div>
   );
@@ -210,7 +211,7 @@ export function PageTitle({ title, sub, children }: { title: ReactNode; sub?: st
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-[28px] font-light leading-tight tracking-tight text-mab-encre sm:text-[34px] [&_b]:font-semibold">{title}</h1>
+        <h1 className="text-[26px] font-light leading-tight tracking-tight text-mab-encre sm:text-[34px] [&_b]:font-semibold">{title}</h1>
         {sub && <p className="mt-1 text-[15px] text-mab-texte">{sub}</p>}
       </div>
       {children && <div className="flex flex-wrap gap-2">{children}</div>}
@@ -235,6 +236,36 @@ export function Tabs<T extends string>({ value, onChange, items }: { value: T; o
           {it.count !== undefined && <span className="ml-1.5 opacity-70">{it.count}</span>}
         </button>
       ))}
+    </div>
+  );
+}
+
+export type MenuAction = { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; onClick: () => void; danger?: boolean; hidden?: boolean };
+
+/** Bouton « ⋯ » qui ouvre une liste d'actions (utile sur téléphone). */
+export function ActionMenu({ actions, label = 'Plus d’actions', className = '' }: { actions: MenuAction[]; label?: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const list = actions.filter((a) => !a.hidden);
+  if (!list.length) return null;
+  return (
+    <div className={`relative ${className}`}>
+      <IconButton label={label} className="border border-mab-filet" onClick={() => setOpen((o) => !o)}><MoreHorizontal size={18} /></IconButton>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-11 z-50 w-60 rounded-mab-champ border border-mab-filet bg-white p-1 shadow-mab-flottante">
+            {list.map((a) => (
+              <button
+                key={a.label}
+                onClick={() => { setOpen(false); a.onClick(); }}
+                className={`flex w-full items-center gap-2.5 rounded-mab-etiquette px-3 py-2.5 text-left text-sm hover:bg-mab-wash ${a.danger ? 'text-mab-erreur' : 'text-mab-encre'}`}
+              >
+                <a.icon size={16} className="shrink-0" /> {a.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

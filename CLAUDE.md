@@ -51,6 +51,12 @@ expliquer en français, sans jargon.
   membres (« Vu par »). Trigger `protect_conversation` : un non-admin du groupe
   ne peut qu'épingler des messages ou se retirer. Photos de groupe dans
   `avatars/groupes/<id>/`. Sourdine = pas de son ni de pastille, @mention notifiée.
+- Mobile (audit 375 px) : barre d'onglets en bas (`MobileNav`, masquée dans une
+  conversation), messagerie plein écran sous `lg`, fenêtres en feuille du bas,
+  zones sûres iPhone (`pt-safe` / `pb-safe`, `viewport-fit=cover`), champs à
+  16 px sous `lg` (pas de zoom iOS), `.grid > * { min-width: 0 }` contre les
+  débordements, `.hover-reveal` et `[@media(hover:hover)]` pour les actions au
+  survol (au doigt : toucher un message). Tableaux → cartes sous `sm`.
 - Mise en production : tester en démo → valider 004 en transaction annulée →
   demander à Jonathan → `db:push` → aperçu Netlify → production.
 
