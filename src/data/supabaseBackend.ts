@@ -12,8 +12,10 @@ function clean<T extends object>(row: T): T {
 const TABLES: Table[] = [
   'profiles', 'projects', 'tasks', 'comments', 'events', 'notifications', 'activity',
   'conversations', 'messages', 'reads', 'task_comments', 'templates',
-  'reactions', 'announcements', 'announcement_reads', 'docs', 'absences', 'link_folders', 'links',
+  'reactions', 'announcements', 'announcement_reads', 'docs', 'absences', 'link_folders', 'links', 'last_seen',
 ];
+/** « last_seen » change souvent : on ne recharge pas tout l'écran pour ça. */
+const LIVE_TABLES = TABLES.filter((t) => t !== 'last_seen');
 
 export function makeSupabaseBackend(url: string, anonKey: string): Backend {
   const sb: SupabaseClient = createClient(url, anonKey);
@@ -140,7 +142,7 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
     subscribe(cb) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const ch = sb.channel('mahq-changes');
-      TABLES.forEach((t) =>
+      LIVE_TABLES.forEach((t) =>
         ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => {
           clearTimeout(timer);
           timer = setTimeout(cb, 300);
@@ -148,6 +150,13 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
       );
       ch.subscribe();
       return () => { clearTimeout(timer); sb.removeChannel(ch); };
+    },
+
+    presence(me, onChange) {
+      const ch = sb.channel('mahq-presence', { config: { presence: { key: me.id } } });
+      ch.on('presence', { event: 'sync' }, () => onChange(new Set(Object.keys(ch.presenceState()))));
+      ch.subscribe(async (status) => { if (status === 'SUBSCRIBED') await ch.track({ at: new Date().toISOString() }); });
+      return () => { sb.removeChannel(ch); };
     },
 
     onAuth(cb) {

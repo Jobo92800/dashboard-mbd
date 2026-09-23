@@ -10,6 +10,7 @@ export function AvailabilityPicker() {
   if (!me) return null;
   const set = (a: Availability) => updateProfile(me.id, { availability: a });
   return (
+    <>
     <div className="flex flex-wrap items-center gap-2">
       {(['disponible', 'occupe', 'absent'] as Availability[]).map((a) => (
         <button
@@ -32,5 +33,7 @@ export function AvailabilityPicker() {
         className="!h-9 min-w-[220px] flex-1 !text-sm"
       />
     </div>
+    <p className="mt-2 text-xs text-mab-gris-doux">Quand l’appli est fermée, l’équipe te voit automatiquement « Hors ligne ».</p>
+    </>
   );
 }

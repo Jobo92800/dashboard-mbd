@@ -62,6 +62,11 @@ expliquer en français, sans jargon.
   ligne « Dossier X : » crée/choisit le dossier. Icône = `<origine>/favicon.ico`
   du site (pas de service tiers). La 007 insère les dossiers « Application » et
   « LP » fournis par Jonathan.
+- Présence (migration 008) : en ligne / hors ligne via Supabase Realtime
+  Presence (canal `mahq-presence`, rien en base) ; `last_seen` (upsert au
+  démarrage, toutes les 2 min si visible, en quittant) pour « vu il y a… », hors
+  publication temps réel pour ne pas recharger tout le monde. Démo : les onglets
+  se signalent via BroadcastChannel. `PresenceDot` / `usePresenceText`.
 - Mise en production : tester en démo → valider 004 en transaction annulée →
   demander à Jonathan → `db:push` → aperçu Netlify → production.
 

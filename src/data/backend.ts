@@ -34,6 +34,8 @@ export interface Backend {
   inviteMember(m: NewMember): Promise<{ tempPassword?: string }>;
   /** Prévient quand les données changent ailleurs (autre onglet, collègue). */
   subscribe(cb: () => void): () => void;
+  /** Qui a l'appli ouverte en ce moment (présence en direct). */
+  presence(me: Profile, onChange: (online: Set<string>) => void): () => void;
   /** Prévient quand la session change (connexion, lien de mot de passe…). */
   onAuth(cb: (event: string) => void): () => void;
 }

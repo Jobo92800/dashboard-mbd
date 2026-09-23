@@ -9,12 +9,22 @@ import { useToast } from '../state/toast';
 import { useOpenAttachment } from '../components/TaskExtras';
 import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { canManage, conversationName, isGroup } from '../lib/conversations';
+import { seenLabel } from '../components/Presence';
 import { Avatar, Badge, Button, Empty, Field, IconButton, Input, Modal, PeoplePicker, Tabs, Textarea } from '../components/ui';
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 function ConvAvatar({ c, meId, size = 40 }: { c: Conversation; meId: string; size?: number }) {
-  const { byId } = useStore();
+  const { byId, online } = useStore();
+  const other = !c.title && c.member_ids.length === 2 ? c.member_ids.find((id) => id !== meId) : undefined;
+  if (other && !c.avatar_url) {
+    return (
+      <span className="relative shrink-0">
+        <Avatar p={byId.get(other)} size={size} />
+        {online.has(other) && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-mab-succes ring-2 ring-white" title="En ligne" />}
+      </span>
+    );
+  }
   if (c.avatar_url) return <img src={c.avatar_url} alt="" className="shrink-0 rounded-full bg-mab-rail object-cover" style={{ width: size, height: size }} />;
   const others = c.member_ids.filter((id) => id !== meId);
   if (others.length === 1 && !c.title) return <Avatar p={byId.get(others[0])} size={size} />;
@@ -215,7 +225,7 @@ function Thread({ conv }: { conv: Conversation }) {
   const pinned = conv.pinned_ids.map((id) => byMsg.get(id)).filter(Boolean) as Message[];
   const [infoOpen, setInfoOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { mutedConvs, setConversationPref, markConversationUnread, deleteConversation, leaveConversation } = useStore();
+  const { mutedConvs, setConversationPref, markConversationUnread, deleteConversation, leaveConversation, online, lastSeenOf } = useStore();
   const myPref = snap.reads.find((r) => r.id === `${conv.id}:${me!.id}`);
   const manage = canManage(conv, me);
   const [mention, setMention] = useState<{ q: string; start: number } | null>(null);
@@ -272,7 +282,16 @@ function Thread({ conv }: { conv: Conversation }) {
         <button className="min-w-0 flex-1 text-left" onClick={() => setInfoOpen(true)}>
           <p className="flex items-center gap-1.5 truncate font-semibold">{name}{mutedConvs.has(conv.id) && <BellOff size={13} className="text-mab-gris-doux" />}</p>
           <p className="truncate text-xs text-mab-texte">
-            {group ? members.map((p) => (p.id === me!.id ? 'toi' : p.full_name.split(' ')[0])).join(', ') : members.find((p) => p.id !== me!.id)?.job_title}
+            {group
+              ? (() => {
+                const on = members.filter((p) => p.id !== me!.id && online.has(p.id)).length;
+                return `${members.map((p) => (p.id === me!.id ? 'toi' : p.full_name.split(' ')[0])).join(', ')}${on ? ` · ${on} en ligne` : ''}`;
+              })()
+              : (() => {
+                const other = members.find((p) => p.id !== me!.id);
+                if (!other) return '';
+                return online.has(other.id) ? <span className="font-medium text-mab-succes">En ligne</span> : seenLabel(lastSeenOf(other.id));
+              })()}
           </p>
         </button>
         <IconButton label={group ? 'Infos du groupe' : 'Infos'} onClick={() => setInfoOpen(true)}><Info size={18} /></IconButton>

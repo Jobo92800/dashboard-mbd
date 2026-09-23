@@ -58,6 +58,7 @@ export function visibleFor(me: Profile, s: Snapshot): Snapshot {
     announcements: s.announcements,
     announcement_reads: s.announcement_reads,
     absences: s.absences,
+    last_seen: s.last_seen,
     comments: s.comments.filter((c) => ids.has(c.project_id)),
     events: s.events.filter((e) => canSeeEvent(me, e)),
     ...privateParts,

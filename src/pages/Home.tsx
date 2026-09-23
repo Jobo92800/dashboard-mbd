@@ -10,14 +10,16 @@ import type { Task } from '../lib/types';
 import { TaskRow } from '../components/TaskRow';
 import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { AvailabilityPicker } from '../components/AvailabilityPicker';
-import { Avatar, AvailDot, Badge, Button, Card, Empty, PageTitle, Progress, Stat, Surtitre } from '../components/ui';
+import { Avatar, Badge, Button, Card, Empty, PageTitle, Progress, Stat, Surtitre } from '../components/ui';
 import { fmtDur } from '../components/EventModal';
 import { conversationName } from '../lib/conversations';
 import { AnnouncementCard } from './Announcements';
+import { PresenceDot, usePresenceText } from '../components/Presence';
 import { absenceKind, absenceOn } from '../lib/absences';
 
 export default function Home() {
-  const { me, snap, byId, unreadByConv, unreadAnnouncements, mutedConvs } = useStore();
+  const { me, snap, byId, unreadByConv, unreadAnnouncements, mutedConvs, online } = useStore();
+  const presenceText = usePresenceText();
   const unreadConvs = snap.conversations.filter((c) => unreadByConv.has(c.id) && !mutedConvs.has(c.id));
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const today = todayIso();
@@ -151,14 +153,16 @@ export default function Home() {
           <Card className="p-5">
             <h2 className="mb-3 text-lg font-semibold">L’équipe maintenant</h2>
             <div className="grid gap-2.5">
-              {snap.profiles.filter((p) => p.active && p.id !== me!.id).map((p) => {
+              {snap.profiles.filter((p) => p.active && p.id !== me!.id)
+                .sort((a, b) => Number(online.has(b.id)) - Number(online.has(a.id)) || a.full_name.localeCompare(b.full_name))
+                .map((p) => {
                 const away = absenceOn(snap.absences.filter((a) => a.status === 'validee'), p.id, today);
                 return (
-                  <div key={p.id} className={`flex items-center gap-3 ${away ? 'opacity-60' : ''}`}>
-                    <span className="relative"><Avatar p={p} size={32} /><AvailDot a={away ? 'absent' : p.availability} className="absolute -bottom-0.5 -right-0.5" /></span>
+                  <div key={p.id} className={`flex items-center gap-3 ${away || !online.has(p.id) ? 'opacity-70' : ''}`}>
+                    <span className="relative"><Avatar p={p} size={32} /><PresenceDot p={p} className="absolute -bottom-0.5 -right-0.5" /></span>
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{p.full_name}</p>
-                      <p className="truncate text-xs text-mab-texte">{away ? `🌴 ${absenceKind(away, me)} jusqu’au ${away.end_date.split('-').reverse().slice(0, 2).join('/')}` : p.availability_note || '—'}</p>
+                      <p className="truncate text-xs text-mab-texte">{away ? `🌴 ${absenceKind(away, me)} jusqu’au ${away.end_date.split('-').reverse().slice(0, 2).join('/')}` : presenceText(p)}</p>
                     </div>
                   </div>
                 );

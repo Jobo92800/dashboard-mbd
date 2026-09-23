@@ -13,7 +13,7 @@ type AttachmentInput = { file?: File; name?: string; url?: string };
 const EMPTY: Snapshot = {
   profiles: [], projects: [], tasks: [], comments: [], events: [], notifications: [], activity: [],
   conversations: [], messages: [], reads: [], task_comments: [], templates: [],
-  reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [],
+  reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [], last_seen: [],
 };
 const now = () => new Date().toISOString();
 
@@ -27,6 +27,8 @@ function useStoreValue() {
   const [snap, setSnap] = useState<Snapshot>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [recovery, setRecovery] = useState(false);
+  /** Personnes qui ont l'appli ouverte en ce moment. */
+  const [online, setOnline] = useState<Set<string>>(new Set());
   const meRef = useRef(me);
   /** Toujours la version la plus récente des données (utile entre deux envois successifs). */
   const snapRef = useRef(snap);
@@ -54,6 +56,20 @@ function useStoreValue() {
       if (event === 'SIGNED_OUT') { setMe(null); setSnap(EMPTY); setLoaded(false); }
     });
   }, []);
+
+  // Présence en direct + « vu pour la dernière fois » (au démarrage, toutes les 2 min, en quittant).
+  useEffect(() => {
+    if (!me?.id) return;
+    const stop = backend.presence(me, setOnline);
+    const mark = () => backend.upsert('last_seen', { id: me.id, seen_at: new Date().toISOString() }).catch(() => {});
+    mark();
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') mark(); }, 120_000);
+    const onHide = () => { if (document.visibilityState === 'hidden') mark(); };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', mark);
+    return () => { stop(); clearInterval(timer); document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', mark); setOnline(new Set()); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
 
   useEffect(() => {
     if (!me?.id) return;
@@ -889,7 +905,9 @@ function useStoreValue() {
     return snap.announcements.filter((x) => !read.has(x.id));
   }, [snap.announcements, snap.announcement_reads, me]);
 
-  return { me, booting, loaded, snap, byId, unreadByConv, unreadMessages, mutedConvs, unreadAnnouncements, recovery, setRecovery, mode: backend.mode, reload, ...actions };
+  const lastSeenOf = (id: string) => snap.last_seen.find((x) => x.id === id)?.seen_at ?? null;
+
+  return { me, booting, loaded, snap, byId, online, lastSeenOf, unreadByConv, unreadMessages, mutedConvs, unreadAnnouncements, recovery, setRecovery, mode: backend.mode, reload, ...actions };
 }
 
 function escapeRe(s: string) {

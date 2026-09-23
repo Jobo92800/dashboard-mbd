@@ -261,6 +261,12 @@ export interface UsefulLink {
   updated_at: string;
 }
 
+/** Dernière présence connue d'une personne (id = id de la personne). */
+export interface LastSeen {
+  id: string;
+  seen_at: string;
+}
+
 export interface Snapshot {
   profiles: Profile[];
   projects: Project[];
@@ -281,6 +287,7 @@ export interface Snapshot {
   absences: Absence[];
   link_folders: LinkFolder[];
   links: UsefulLink[];
+  last_seen: LastSeen[];
 }
 
 export type Table = keyof Snapshot;

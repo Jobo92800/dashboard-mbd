@@ -3,16 +3,17 @@ import { Mail, MessageSquare } from 'lucide-react';
 import { useStore } from '../state/store';
 import type { Profile } from '../lib/types';
 import { isDone, isLate, sortTasks } from '../lib/selectors';
-import { AVAIL_LABEL, AvailDot, Avatar, Card, PageTitle } from '../components/ui';
+import { Avatar, Card, PageTitle } from '../components/ui';
+import { PresenceDot, usePresenceText } from '../components/Presence';
 import { TaskRow } from '../components/TaskRow';
 import { absenceKind, absenceOn } from '../lib/absences';
 import { todayIso } from '../lib/dates';
 
 export default function Team() {
-  const { snap } = useStore();
+  const { snap, online } = useStore();
   const [params, setParams] = useSearchParams();
   const selected = params.get('personne');
-  const people = snap.profiles.filter((p) => p.active);
+  const people = snap.profiles.filter((p) => p.active).sort((a, b) => Number(online.has(b.id)) - Number(online.has(a.id)));
   const person = people.find((p) => p.id === selected);
   const maxLoad = Math.max(1, ...people.map((p) => snap.tasks.filter((t) => t.assignee_id === p.id && !isDone(t)).length));
 
@@ -45,6 +46,7 @@ export default function Team() {
 
 function PersonCard({ p, max, active, onClick }: { p: Profile; max: number; active: boolean; onClick: () => void }) {
   const { snap, me } = useStore();
+  const presenceText = usePresenceText();
   const open = snap.tasks.filter((t) => t.assignee_id === p.id && !isDone(t));
   const late = open.filter(isLate).length;
   const projects = snap.projects.filter((x) => x.status === 'en_cours' && x.member_ids.includes(p.id));
@@ -52,7 +54,7 @@ function PersonCard({ p, max, active, onClick }: { p: Profile; max: number; acti
     <Card className={`p-5 transition ${active ? '!border-mab-aqua bg-mab-wash-2' : 'hover:border-mab-filet-aqua'}`}>
       <button onClick={onClick} className="block w-full text-left">
         <div className="flex items-center gap-3">
-          <span className="relative"><Avatar p={p} size={48} /><AvailDot a={p.availability} className="absolute bottom-0 right-0 h-3 w-3" /></span>
+          <span className="relative"><Avatar p={p} size={48} /><PresenceDot p={p} size={13} className="absolute bottom-0 right-0" /></span>
           <div className="min-w-0 flex-1">
             <p className="font-semibold">{p.full_name} {p.role === 'admin' && <span className="ml-1 text-xs font-normal text-mab-texte">· admin</span>}</p>
             <p className="truncate text-sm text-mab-texte">{p.job_title}</p>
@@ -65,7 +67,7 @@ function PersonCard({ p, max, active, onClick }: { p: Profile; max: number; acti
             <>
               {away
                 ? <p className="mt-3 text-sm"><b className="font-medium">🌴 {absenceKind(away, me)}</b><span className="text-mab-texte"> jusqu’au {away.end_date.split('-').reverse().slice(0, 2).join('/')}</span></p>
-                : <p className="mt-3 text-sm"><b className="font-medium">{AVAIL_LABEL[p.availability]}</b>{p.availability_note && <span className="text-mab-texte"> · {p.availability_note}</span>}</p>}
+                : <p className="mt-3 text-sm text-mab-texte">{presenceText(p)}</p>}
               {!away && next && <p className="text-xs text-mab-texte">Prochaine absence : {next.start_date.split('-').reverse().slice(0, 2).join('/')} → {next.end_date.split('-').reverse().slice(0, 2).join('/')}</p>}
             </>
           );

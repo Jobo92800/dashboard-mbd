@@ -24,7 +24,7 @@ function read(): Snapshot {
 function normalize(raw: Partial<Snapshot>): Snapshot {
   const s = {
     conversations: [], messages: [], reads: [], task_comments: [], templates: [],
-    reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [], ...raw,
+    reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [], last_seen: [], ...raw,
   } as Snapshot;
   s.messages = s.messages.map((m) => ({ ...m, reply_to: m.reply_to ?? null, attachments: m.attachments ?? [], edited_at: m.edited_at ?? null }));
   s.conversations = s.conversations.map((c) => ({
@@ -177,6 +177,18 @@ export const demoBackend: Backend = {
 
   onAuth() {
     return () => {};
+  },
+
+  /** Démo : les onglets ouverts se signalent entre eux ; chacun est « en ligne » pour les autres. */
+  presence(me, onChange) {
+    const seen = new Map<string, number>([[me.id, Date.now()]]);
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('mahq-presence') : null;
+    const emit = () => onChange(new Set([...seen].filter(([, at]) => Date.now() - at < 12_000).map(([id]) => id)));
+    const ping = () => { seen.set(me.id, Date.now()); bc?.postMessage({ id: me.id }); emit(); };
+    if (bc) bc.onmessage = (e) => { seen.set(e.data.id, Date.now()); emit(); };
+    ping();
+    const timer = setInterval(ping, 4000);
+    return () => { clearInterval(timer); bc?.close(); };
   },
 };
 
