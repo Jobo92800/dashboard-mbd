@@ -10,6 +10,7 @@ import { AvailDot, Avatar, IconButton } from './ui';
 import { SearchPalette } from './SearchPalette';
 import { useToast } from '../state/toast';
 import { setAppBadge, showSystemNotification, useInstall } from '../lib/device';
+import { playSound } from '../lib/sounds';
 
 export function Layout({ children }: { children: ReactNode }) {
   const { me, snap, mode, loaded, unreadMessages, unreadAnnouncements } = useStore();
@@ -157,7 +158,9 @@ function MessageWatcher() {
       if (seenMsg.current.has(m.id)) continue;
       seenMsg.current.add(m.id);
       const url = `/messages/${m.conversation_id}`;
-      if (m.author_id === me?.id || (loc.pathname === url && !away())) continue;
+      if (m.author_id === me?.id) continue;
+      playSound('message');
+      if (loc.pathname === url && !away()) continue;
       const who = byId.get(m.author_id)?.full_name.split(' ')[0] ?? 'Quelqu’un';
       const text = m.body.length > 90 ? m.body.slice(0, 90) + '…' : m.body;
       if (away()) showSystemNotification(`💬 ${who}`, text, url);
@@ -172,6 +175,7 @@ function MessageWatcher() {
       if (seenNotif.current.has(n.id)) continue;
       seenNotif.current.add(n.id);
       if (n.read) continue;
+      playSound(n.text.startsWith('📣') || n.text.startsWith('⏰ À lire') ? 'annonce' : 'notification');
       if (away()) showSystemNotification('MA HQ', n.text, n.link ?? '/');
       else toast(`🔔 ${n.text}`);
     }
