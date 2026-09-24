@@ -12,8 +12,10 @@ import { absenceWarning } from '../lib/absences';
 import { isAdmin } from '../lib/permissions';
 import { uid } from '../data/backend';
 import { useToast } from '../state/toast';
+import { TaskSheet } from './TaskSheet';
 
-export type TaskDraft = Partial<Task>;
+/** `_mode: 'edit'` ouvre directement le formulaire (sinon, une tâche existante s'ouvre en carte de lecture). */
+export type TaskDraft = Partial<Task> & { _mode?: 'edit' };
 
 function Section({ icon, title, children, aside }: { icon: React.ReactNode; title: string; children: React.ReactNode; aside?: React.ReactNode }) {
   return (
@@ -31,9 +33,15 @@ export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose
   const [t, setT] = useState<TaskDraft>({});
   /** Création : une ou plusieurs personnes (une tâche chacune). */
   const [assignees, setAssignees] = useState<string[]>([]);
+  const [mode, setMode] = useState<'view' | 'edit'>('edit');
+  const [fromView, setFromView] = useState(false);
   useEffect(() => {
     if (draft) {
-      setT({ priority: 'Moyenne', status: 'a_faire', assignee_id: me?.id, checklist: [], attachments: [], recurrence: null, ...draft });
+      const { _mode, ...rest } = draft;
+      const view = !!draft.id && _mode !== 'edit';
+      setMode(view ? 'view' : 'edit');
+      setFromView(view);
+      setT({ priority: 'Moyenne', status: 'a_faire', assignee_id: me?.id, checklist: [], attachments: [], recurrence: null, ...rest });
       // Par défaut « Moi », sauf dans un projet dont je ne fais pas partie (sinon j'y serais ajouté sans le vouloir).
       const proj = snap.projects.find((x) => x.id === draft.project_id);
       const meDefault = me && (!proj || proj.member_ids.includes(me.id)) ? me.id : '';
@@ -53,9 +61,10 @@ export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose
   const set = (patch: TaskDraft) => setT((x) => ({ ...x, ...patch }));
   const valid = !!t.title?.trim();
 
+  const back = () => (fromView ? setMode('view') : onClose());
   const submit = async () => {
     if (!valid || !editable) return;
-    onClose();
+    if (isEdit && fromView) setMode('view'); else onClose();
     // Sous-tâches et pièces jointes d'une tâche existante sont déjà enregistrées au fil de l'eau.
     const { checklist, attachments, ...fields } = t;
     const targets = isEdit ? [t.assignee_id ?? null] : assignees.length ? assignees : [null];
@@ -71,6 +80,10 @@ export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose
     }
     if (targets.length > 1) toast(`Tâche confiée à ${targets.length} personnes`);
   };
+
+  if (mode === 'view' && live) {
+    return <TaskSheet task={live} onClose={onClose} onEdit={() => { setT({ ...live }); setMode('edit'); }} />;
+  }
 
   const checklist = live ? live.checklist : t.checklist ?? [];
   const comments = live ? snap.task_comments.filter((c) => c.task_id === live.id) : [];
@@ -90,7 +103,7 @@ export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose
               <Trash2 size={16} /><span className="max-sm:hidden"> Supprimer</span>
             </Button>
           )}
-          <Button variant="tertiaire" onClick={onClose}>{editable ? 'Annuler' : 'Fermer'}</Button>
+          <Button variant="tertiaire" onClick={back}>{editable ? 'Annuler' : 'Fermer'}</Button>
           {editable && <Button variant="primaire" disabled={!valid} onClick={submit}>{isEdit ? 'Enregistrer' : assignees.length > 1 ? `Confier à ${assignees.length} personnes` : assignees[0] && assignees[0] !== me.id ? `Confier à ${byId.get(assignees[0])?.full_name.split(' ')[0]}` : 'Ajouter la tâche'}</Button>}
         </>
       }

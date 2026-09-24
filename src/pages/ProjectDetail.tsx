@@ -221,7 +221,7 @@ function Kanban({ tasks, onEdit, canEdit }: { tasks: Task[]; onEdit: (t: Task) =
                   key={t.id}
                   draggable={canEdit}
                   onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)}
-                  onClick={() => canEdit && onEdit(t)}
+                  onClick={() => onEdit(t)}
                   className="cursor-pointer rounded-mab-champ border border-mab-filet bg-white p-3 transition hover:border-mab-filet-aqua"
                 >
                   <div className="flex items-start gap-2">

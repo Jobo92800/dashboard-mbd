@@ -58,7 +58,7 @@ export function TaskRow({ task, onEdit, showProject = false, compact = false }: 
     <div className={`group flex items-center gap-3 border-b border-mab-filet px-1 py-3 last:border-0 ${compact ? 'py-2.5' : ''}`}>
       <StatusCheck task={task} disabled={!editable} />
       <div className="min-w-0 flex-1">
-        {onEdit && editable ? (
+        {onEdit ? (
           <button type="button" onClick={() => onEdit(task)} className={`block max-w-full truncate text-left text-[15px] hover:underline ${done ? 'text-mab-gris-doux line-through' : 'text-mab-encre'}`}>{task.title}</button>
         ) : (
           <p className={`truncate text-[15px] ${done ? 'text-mab-gris-doux line-through' : 'text-mab-encre'}`}>{task.title}</p>
@@ -85,7 +85,7 @@ export function TaskRow({ task, onEdit, showProject = false, compact = false }: 
       )}
       <Avatar p={byId.get(task.assignee_id ?? '')} size={28} />
       {onEdit && editable && (
-        <IconButton label="Modifier la tâche" className="hidden opacity-60 group-hover:opacity-100 sm:grid" onClick={() => onEdit(task)}>
+        <IconButton label="Modifier la tâche" className="hidden opacity-60 group-hover:opacity-100 sm:grid" onClick={() => onEdit({ ...task, _mode: 'edit' } as Task)}>
           <Pencil size={15} />
         </IconButton>
       )}
