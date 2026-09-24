@@ -13,6 +13,7 @@ import { EventModal, fmtDur } from '../components/EventModal';
 import { Avatar, AvatarStack, Button, Card, IconButton, PageTitle } from '../components/ui';
 import { absenceKind, absenceRange } from '../lib/absences';
 import { KIND_COLOR } from './Absences';
+import { isAssigned } from '../lib/assignees';
 
 export default function Agenda() {
   const { snap, byId, me } = useStore();
@@ -23,7 +24,7 @@ export default function Agenda() {
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
 
   const days = eachDayOfInterval({ start: startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 }), end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 }) });
-  const tasks = useMemo(() => snap.tasks.filter((t) => t.due_date && (!person || t.assignee_id === person)), [snap.tasks, person]);
+  const tasks = useMemo(() => snap.tasks.filter((t) => t.due_date && (!person || isAssigned(t, person))), [snap.tasks, person]);
   const events = useMemo(() => snap.events.filter((e) => !person || e.participant_ids.includes(person)), [snap.events, person]);
   const projectColor = (id: string | null) => snap.projects.find((p) => p.id === id)?.color ?? '#9babab';
 

@@ -10,6 +10,7 @@ import { PresenceDot, usePresenceText } from '../components/Presence';
 import { TaskRow } from '../components/TaskRow';
 import { absenceKind, absenceOn } from '../lib/absences';
 import { todayIso } from '../lib/dates';
+import { isAssigned } from '../lib/assignees';
 
 export default function Team() {
   const { snap, online } = useStore();
@@ -18,7 +19,7 @@ export default function Team() {
   const selected = params.get('personne');
   const people = snap.profiles.filter((p) => p.active).sort((a, b) => Number(online.has(b.id)) - Number(online.has(a.id)));
   const person = people.find((p) => p.id === selected);
-  const maxLoad = Math.max(1, ...people.map((p) => snap.tasks.filter((t) => t.assignee_id === p.id && !isDone(t)).length));
+  const maxLoad = Math.max(1, ...people.map((p) => snap.tasks.filter((t) => isAssigned(t, p.id) && !isDone(t)).length));
 
   return (
     <>
@@ -39,8 +40,8 @@ export default function Team() {
             </div>
           </div>
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-[.12em] text-mab-aqua-texte">Tâches ouvertes</h3>
-          {sortTasks(snap.tasks.filter((t) => t.assignee_id === person.id && !isDone(t))).map((t) => <TaskRow key={t.id} task={t} showProject />)}
-          {!snap.tasks.some((t) => t.assignee_id === person.id && !isDone(t)) && <p className="py-3 text-sm text-mab-texte">Aucune tâche ouverte visible.</p>}
+          {sortTasks(snap.tasks.filter((t) => isAssigned(t, person.id) && !isDone(t))).map((t) => <TaskRow key={t.id} task={t} showProject />)}
+          {!snap.tasks.some((t) => isAssigned(t, person.id) && !isDone(t)) && <p className="py-3 text-sm text-mab-texte">Aucune tâche ouverte visible.</p>}
         </Card>
       )}
       <TaskModal draft={draft} onClose={() => setDraft(null)} />
@@ -51,7 +52,7 @@ export default function Team() {
 function PersonCard({ p, max, active, onClick, onAssign }: { p: Profile; max: number; active: boolean; onClick: () => void; onAssign: () => void }) {
   const { snap, me } = useStore();
   const presenceText = usePresenceText();
-  const open = snap.tasks.filter((t) => t.assignee_id === p.id && !isDone(t));
+  const open = snap.tasks.filter((t) => isAssigned(t, p.id) && !isDone(t));
   const late = open.filter(isLate).length;
   const projects = snap.projects.filter((x) => x.status === 'en_cours' && x.member_ids.includes(p.id));
   return (

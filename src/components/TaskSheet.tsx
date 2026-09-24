@@ -12,6 +12,7 @@ import { ActionMenu, Avatar, Badge, Button, Modal } from './ui';
 import { Attachments, ChecklistEditor } from './TaskExtras';
 import { Discussion } from './Comments';
 import { PresenceDot, usePresenceText } from './Presence';
+import { assigneesOf } from '../lib/assignees';
 
 const STATUS: { id: TaskStatus; label: string }[] = [
   { id: 'a_faire', label: 'À faire' },
@@ -45,12 +46,12 @@ export function TaskSheet({ task, onEdit, onClose }: { task: Task; onEdit: () =>
   const { snap, me, byId, setTaskStatus, setChecklist, addTaskComment, deleteTaskComment, deleteTask } = useStore();
   const presenceText = usePresenceText();
   const project = snap.projects.find((p) => p.id === task.project_id);
-  const assignee = byId.get(task.assignee_id ?? '');
+  const people = assigneesOf(task).map((id) => byId.get(id)).filter(Boolean) as NonNullable<ReturnType<typeof byId.get>>[];
   const creator = byId.get(task.created_by ?? '');
   const editable = canEditTask(me!, task, snap.projects);
   const done = isDone(task);
   const late = isLate(task);
-  const warning = !done ? absenceWarning(snap.absences, assignee, task.due_date, me) : null;
+  const warning = !done ? people.map((p) => absenceWarning(snap.absences, p, task.due_date, me)).filter(Boolean).join(' ') : null;
   const comments = snap.task_comments.filter((c) => c.task_id === task.id);
   const commenters = snap.profiles.filter((p) => p.active && (!project || project.member_ids.includes(p.id) || p.role === 'admin'));
   const checklistDone = task.checklist.filter((c) => c.done).length;
@@ -120,14 +121,18 @@ export function TaskSheet({ task, onEdit, onClose }: { task: Task; onEdit: () =>
 
         {/* Infos clés */}
         <div className="grid gap-2.5 sm:grid-cols-2">
-          <Info icon={<UserRound size={17} />} label="Responsable">
-            {assignee ? (
-              <span className="flex items-center gap-2.5">
-                <span className="relative"><Avatar p={assignee} size={30} /><PresenceDot p={assignee} className="absolute -bottom-0.5 -right-0.5" /></span>
-                <span className="min-w-0">
-                  <span className="block font-medium">{assignee.id === me!.id ? 'Moi' : assignee.full_name}</span>
-                  <span className="block truncate text-xs text-mab-texte">{presenceText(assignee)}</span>
-                </span>
+          <Info icon={<UserRound size={17} />} label={people.length > 1 ? `Partagée entre ${people.length}` : 'Responsable'}>
+            {people.length ? (
+              <span className="grid gap-2">
+                {people.map((a) => (
+                  <span key={a.id} className="flex items-center gap-2.5">
+                    <span className="relative"><Avatar p={a} size={30} /><PresenceDot p={a} className="absolute -bottom-0.5 -right-0.5" /></span>
+                    <span className="min-w-0">
+                      <span className="block font-medium">{a.id === me!.id ? 'Moi' : a.full_name}</span>
+                      <span className="block truncate text-xs text-mab-texte">{presenceText(a)}</span>
+                    </span>
+                  </span>
+                ))}
               </span>
             ) : <span className="text-mab-gris-doux">Personne</span>}
           </Info>

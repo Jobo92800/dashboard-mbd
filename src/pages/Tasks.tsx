@@ -8,6 +8,7 @@ import { isAdmin } from '../lib/permissions';
 import { TaskRow } from '../components/TaskRow';
 import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { Button, Card, Empty, PageTitle, Tabs } from '../components/ui';
+import { assigneesOf, isAssigned } from '../lib/assignees';
 
 type TabId = 'miennes' | 'confiees' | 'rapides' | 'retard' | 'toutes';
 const sel = 'h-10 rounded-mab-pilule border border-mab-filet bg-white px-4 text-sm text-mab-encre max-sm:min-w-0 max-sm:flex-[1_1_45%]';
@@ -33,8 +34,8 @@ export default function Tasks() {
 
   const base = useMemo(() => {
     switch (tab) {
-      case 'miennes': return snap.tasks.filter((t) => t.assignee_id === me!.id);
-      case 'confiees': return snap.tasks.filter((t) => t.created_by === me!.id && t.assignee_id && t.assignee_id !== me!.id);
+      case 'miennes': return snap.tasks.filter((t) => isAssigned(t, me!.id));
+      case 'confiees': return snap.tasks.filter((t) => t.created_by === me!.id && assigneesOf(t).some((id) => id !== me!.id));
       case 'rapides': return snap.tasks.filter((t) => !t.project_id);
       case 'retard': return snap.tasks.filter(isLate);
       default: return snap.tasks;
@@ -44,7 +45,7 @@ export default function Tasks() {
   const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const list = sortTasks(base.filter((t) =>
     (showDone || !isDone(t)) &&
-    (!person || t.assignee_id === person) &&
+    (!person || isAssigned(t, person)) &&
     (!prio || t.priority === prio) &&
     (!centre || t.centre === centre) &&
     (!project || (project === 'rapide' ? !t.project_id : t.project_id === project)) &&
@@ -61,8 +62,8 @@ export default function Tasks() {
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Tabs value={tab} onChange={setTab} items={[
-          { id: 'miennes', label: 'Les miennes', count: count((t) => t.assignee_id === me!.id) },
-          { id: 'confiees', label: 'Confiées', count: count((t) => t.created_by === me!.id && !!t.assignee_id && t.assignee_id !== me!.id) },
+          { id: 'miennes', label: 'Les miennes', count: count((t) => isAssigned(t, me!.id)) },
+          { id: 'confiees', label: 'Confiées', count: count((t) => t.created_by === me!.id && assigneesOf(t).some((id) => id !== me!.id)) },
           { id: 'rapides', label: 'Rapides', count: count((t) => !t.project_id) },
           { id: 'retard', label: 'En retard', count: snap.tasks.filter(isLate).length },
           { id: 'toutes', label: isAdmin(me) ? 'Toutes' : 'Toutes celles que je vois', count: count(() => true) },

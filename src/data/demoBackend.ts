@@ -32,7 +32,7 @@ function normalize(raw: Partial<Snapshot>): Snapshot {
     admin_ids: c.admin_ids ?? (c.created_by ? [c.created_by] : []),
   }));
   s.reads = s.reads.map((r) => ({ ...r, muted: r.muted ?? false, pinned: r.pinned ?? false }));
-  s.tasks = s.tasks.map((t) => ({ ...t, checklist: t.checklist ?? [], attachments: t.attachments ?? [], recurrence: t.recurrence ?? null }));
+  s.tasks = s.tasks.map((t) => ({ ...t, checklist: t.checklist ?? [], attachments: t.attachments ?? [], recurrence: t.recurrence ?? null, assignee_ids: t.assignee_ids?.length ? t.assignee_ids : t.assignee_id ? [t.assignee_id] : [] }));
   s.profiles = s.profiles.map((p) => ({ ...p, recap_email: p.recap_email ?? true, avatar_url: p.avatar_url ?? null }));
   return s;
 }

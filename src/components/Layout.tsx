@@ -13,6 +13,7 @@ import { NameSetup } from './NameSetup';
 import { useToast } from '../state/toast';
 import { setAppBadge, showSystemNotification, useInstall } from '../lib/device';
 import { playSound } from '../lib/sounds';
+import { isAssigned } from '../lib/assignees';
 
 export function Layout({ children }: { children: ReactNode }) {
   const { me, snap, mode, loaded, unreadMessages, unreadAnnouncements } = useStore();
@@ -239,7 +240,7 @@ function MobileNav({ onMore }: { onMore: () => void }) {
 /** Mes tâches à traiter : en retard, du jour, et sans échéance (les tâches datées plus tard ne comptent pas). */
 function myDay(tasks: Task[], meId: string) {
   const today = todayIso();
-  const mine = tasks.filter((t) => t.assignee_id === meId && t.status !== 'fait' && (!t.due_date || t.due_date <= today));
+  const mine = tasks.filter((t) => isAssigned(t, meId) && t.status !== 'fait' && (!t.due_date || t.due_date <= today));
   const late = mine.filter(isLate).length;
   const noDate = mine.filter((t) => !t.due_date).length;
   const total = mine.length;

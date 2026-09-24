@@ -72,6 +72,10 @@ expliquer en français, sans jargon.
   `UpdateNotice` compare toutes les 2 min et au retour sur l'appli, puis propose
   « Actualiser ». Le message de commit sert de note de nouveauté : l'écrire en
   français lisible par l'équipe.
+- Tâches partagées (migration 010) : `tasks.assignee_ids uuid[]`, `assignee_id` =
+  première personne (compatibilité). Toujours passer par `assigneesOf` /
+  `isAssigned` / `withAssignees` (`src/lib/assignees.ts`). Une tâche confiée à
+  plusieurs = UNE tâche, cochée pour tous ; fin → les autres sont prévenus.
 - Mise en production : tester en démo → valider 004 en transaction annulée →
   demander à Jonathan → `db:push` → aperçu Netlify → production.
 

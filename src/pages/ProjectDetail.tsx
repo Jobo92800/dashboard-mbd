@@ -6,12 +6,13 @@ import type { Project, Task, TaskStatus } from '../lib/types';
 import { daysUntil, fmtShort, fmtStamp } from '../lib/dates';
 import { isDone, isLate, progress, projectHealth, sortTasks } from '../lib/selectors';
 import { isAdmin, isProjectMember } from '../lib/permissions';
-import { TaskRow, StatusCheck, TaskMeta } from '../components/TaskRow';
+import { AssigneeStack, TaskRow, StatusCheck, TaskMeta } from '../components/TaskRow';
 import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { ProjectModal } from '../components/ProjectModal';
 import { DuplicateModal, SaveTemplateModal } from '../components/TemplateModals';
 import { Comments } from '../components/Comments';
 import { ActionMenu, Avatar, AvatarStack, Badge, Button, Card, Empty, Modal, Progress, Select, Surtitre, Tabs } from '../components/ui';
+import { isAssigned } from '../lib/assignees';
 
 type View = 'roadmap' | 'tableau' | 'liste';
 
@@ -48,7 +49,7 @@ export default function ProjectDetail() {
   const pr = progress(snap.tasks, project.id);
   const h = projectHealth(project, snap.tasks);
   const left = project.end_date ? daysUntil(project.end_date) : null;
-  const filtered = sortTasks(tasks.filter((t) => (!person || t.assignee_id === person) && (!hideDone || !isDone(t))));
+  const filtered = sortTasks(tasks.filter((t) => (!person || isAssigned(t, person)) && (!hideDone || !isDone(t))));
   const phases = [...project.phases, ...(tasks.some((t) => !t.phase || !project.phases.includes(t.phase)) ? ['Sans étape'] : [])];
   const phaseOf = (t: Task) => (t.phase && project.phases.includes(t.phase) ? t.phase : 'Sans étape');
   const activity = snap.activity.filter((a) => a.project_id === project.id).sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 10);
@@ -196,7 +197,7 @@ const COLS: { id: TaskStatus; label: string }[] = [
 ];
 
 function Kanban({ tasks, onEdit, canEdit }: { tasks: Task[]; onEdit: (t: Task) => void; canEdit: boolean }) {
-  const { setTaskStatus, byId } = useStore();
+  const { setTaskStatus } = useStore();
   const [over, setOver] = useState<TaskStatus | null>(null);
   return (
     <div className="grid gap-4 md:grid-cols-3">
@@ -241,7 +242,7 @@ function Kanban({ tasks, onEdit, canEdit }: { tasks: Task[]; onEdit: (t: Task) =
                   )}
                   <div className="mt-2 flex items-center justify-between text-xs text-mab-texte">
                     <span className="flex items-center gap-2.5"><span className={isLate(t) ? 'font-semibold text-mab-erreur' : ''}>{fmtShort(t.due_date)}</span><TaskMeta task={t} /></span>
-                    <Avatar p={byId.get(t.assignee_id ?? '')} size={22} />
+                    <AssigneeStack task={t} size={22} />
                   </div>
                 </div>
               ))}

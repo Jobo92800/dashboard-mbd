@@ -11,6 +11,7 @@ import { isDone, isLate, progress, projectHealth } from '../lib/selectors';
 import { isAdmin } from '../lib/permissions';
 import { ProjectModal } from '../components/ProjectModal';
 import { AvatarStack, Avatar, Badge, Button, Card, Empty, PageTitle, Progress, Stat, Tabs } from '../components/ui';
+import { isAssigned } from '../lib/assignees';
 
 type TabId = ProjectStatus;
 
@@ -151,7 +152,7 @@ function WhoDoesWhat() {
   const { snap } = useStore();
   const rows = useMemo(() => {
     return snap.profiles.filter((p) => p.active).map((person) => {
-      const open = snap.tasks.filter((t) => t.assignee_id === person.id && !isDone(t) && t.project_id);
+      const open = snap.tasks.filter((t) => isAssigned(t, person.id) && !isDone(t) && t.project_id);
       const projects = snap.projects.filter((p) => p.status === 'en_cours' && p.member_ids.includes(person.id));
       const next = open.filter((t) => t.due_date).sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1))[0];
       return { person, open: open.length, late: open.filter(isLate).length, projects, next };

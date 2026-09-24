@@ -5,7 +5,8 @@ import { useStore } from '../state/store';
 import { isDone, isLate } from '../lib/selectors';
 import { relativeLabel } from '../lib/dates';
 import { canEditTask } from '../lib/permissions';
-import { Avatar, Badge, IconButton } from './ui';
+import { Avatar, AvatarStack, Badge, IconButton } from './ui';
+import { assigneesOf } from '../lib/assignees';
 
 const PRIO_TONE = { Haute: 'emotion', Moyenne: 'factuel', Basse: 'neutre' } as const;
 
@@ -46,10 +47,18 @@ export function TaskMeta({ task }: { task: Task }) {
   );
 }
 
+/** Photo du responsable, ou des personnes qui partagent la tâche. */
+export function AssigneeStack({ task, size = 28 }: { task: Task; size?: number }) {
+  const { byId } = useStore();
+  const ids = assigneesOf(task);
+  if (ids.length <= 1) return <Avatar p={byId.get(ids[0] ?? '')} size={size} />;
+  return <span title={ids.map((id) => byId.get(id)?.full_name).join(', ')}><AvatarStack people={ids.map((id) => byId.get(id))} max={3} size={size} /></span>;
+}
+
 export function TaskRow({ task, onEdit, showProject = false, compact = false }: {
   task: Task; onEdit?: (t: Task) => void; showProject?: boolean; compact?: boolean;
 }) {
-  const { byId, snap, me } = useStore();
+  const { snap, me } = useStore();
   const project = task.project_id ? snap.projects.find((p) => p.id === task.project_id) : undefined;
   const late = isLate(task);
   const done = isDone(task);
@@ -83,7 +92,7 @@ export function TaskRow({ task, onEdit, showProject = false, compact = false }: 
           {task.priority === 'Haute' && <span className="h-2 w-2 shrink-0 rounded-full bg-mab-rose sm:hidden" title="Priorité haute" />}
         </>
       )}
-      <Avatar p={byId.get(task.assignee_id ?? '')} size={28} />
+      <AssigneeStack task={task} size={28} />
       {onEdit && editable && (
         <IconButton label="Modifier la tâche" className="hidden opacity-60 group-hover:opacity-100 sm:grid" onClick={() => onEdit({ ...task, _mode: 'edit' } as Task)}>
           <Pencil size={15} />

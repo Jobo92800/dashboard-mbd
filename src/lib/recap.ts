@@ -2,6 +2,7 @@ import { addDays, endOfWeek, format, parseISO, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Profile, Snapshot, Task } from './types';
 import { isDone, projectHealth } from './selectors';
+import { assigneesOf, isAssigned } from './assignees';
 
 /**
  * Contenu des e-mails automatiques. Utilisé à l'identique par l'aperçu dans
@@ -57,7 +58,7 @@ function taskSub(s: Snapshot, t: Task) {
 export function weeklyRecap(s: Snapshot, person: Profile, appUrl: string, today = new Date()): Email | null {
   const t0 = format(today, 'yyyy-MM-dd');
   const end = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-  const mine = s.tasks.filter((t) => t.assignee_id === person.id && !isDone(t));
+  const mine = s.tasks.filter((t) => isAssigned(t, person.id) && !isDone(t));
   const late = mine.filter((t) => t.due_date && t.due_date < t0).sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1));
   const week = mine.filter((t) => t.due_date && t.due_date >= t0 && t.due_date <= end).sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1));
   const events = s.events
@@ -99,6 +100,7 @@ export function fridayReport(s: Snapshot, appUrl: string, today = new Date()): E
   const nextSun = format(addDays(endOfWeek(today, { weekStartsOn: 1 }), 7), 'yyyy-MM-dd');
   const people = s.profiles.filter((p) => p.active);
   const byId = new Map(s.profiles.map((p) => [p.id, p]));
+  const names = (t: Task) => assigneesOf(t).map((id) => first(byId.get(id))).join(', ') || '—';
 
   const done = s.tasks.filter((t) => t.done_at && t.done_at.slice(0, 10) >= since);
   const late = s.tasks.filter((t) => !isDone(t) && t.due_date && t.due_date < t0);
@@ -107,9 +109,9 @@ export function fridayReport(s: Snapshot, appUrl: string, today = new Date()): E
 
   const perPerson = people.map((p) => ({
     p,
-    done: done.filter((t) => t.assignee_id === p.id).length,
-    late: late.filter((t) => t.assignee_id === p.id).length,
-    next: next.filter((t) => t.assignee_id === p.id).length,
+    done: done.filter((t) => isAssigned(t, p.id)).length,
+    late: late.filter((t) => isAssigned(t, p.id)).length,
+    next: next.filter((t) => isAssigned(t, p.id)).length,
   })).filter((x) => x.done || x.late || x.next);
 
   const table = perPerson.length ? `<p style="margin:22px 0 8px;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:${C.aquaTexte}">Par personne</p>
@@ -121,8 +123,8 @@ ${perPerson.map((x) => `<tr><td style="padding:8px 0;border-top:1px solid ${C.fi
   const body =
     table +
     section('Projets à surveiller', risky.map(({ p, h }) => row(esc(p.name), esc(h.label), p.end_date ? `fin ${short(p.end_date)}` : '')), 'erreur') +
-    section('En retard', late.slice(0, 12).map((t) => row(esc(t.title), `${esc(first(byId.get(t.assignee_id ?? '')))} · ${taskSub(s, t)}`, `<span style="color:${C.erreur}">${short(t.due_date!)}</span>`)), 'erreur') +
-    section('Terminé cette semaine', done.slice(0, 12).map((t) => row(esc(t.title), `${esc(first(byId.get(t.assignee_id ?? '')))} · ${taskSub(s, t)}`)));
+    section('En retard', late.slice(0, 12).map((t) => row(esc(t.title), `${esc(names(t))} · ${taskSub(s, t)}`, `<span style="color:${C.erreur}">${short(t.due_date!)}</span>`)), 'erreur') +
+    section('Terminé cette semaine', done.slice(0, 12).map((t) => row(esc(t.title), `${esc(names(t))} · ${taskSub(s, t)}`)));
 
   const intro = `<b>${done.length}</b> tâche${done.length > 1 ? 's' : ''} terminée${done.length > 1 ? 's' : ''} cette semaine, <b style="color:${late.length ? C.erreur : C.encre}">${late.length}</b> en retard, <b>${next.length}</b> prévue${next.length > 1 ? 's' : ''} la semaine prochaine.`;
   return {

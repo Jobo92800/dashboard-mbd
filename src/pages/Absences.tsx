@@ -9,6 +9,7 @@ import { toIso, todayIso } from '../lib/dates';
 import { isAdmin } from '../lib/permissions';
 import { absenceKind, absenceRange, absencesBetween } from '../lib/absences';
 import { Avatar, Badge, Button, Card, Empty, Field, IconButton, Input, Modal, PageTitle, Select, Textarea } from '../components/ui';
+import { isAssigned } from '../lib/assignees';
 
 export const KIND_COLOR: Record<string, string> = {
   'Congés': '#3bbfbf', Formation: '#8e6fc6', 'Déplacement': '#3d6e93', Maladie: '#9babab', Absence: '#9babab', Autre: '#8e3c80',
@@ -164,7 +165,7 @@ export function AbsenceModal({ draft, onClose }: { draft: Partial<Absence> | nul
   useEffect(() => { if (draft) setA({ kind: 'Congés', start_date: todayIso(), end_date: todayIso(), note: '', ...draft }); }, [draft]);
   const overlapTasks = useMemo(() => {
     if (!a.user_id || !a.start_date || !a.end_date) return [];
-    return snap.tasks.filter((t) => t.assignee_id === a.user_id && t.status !== 'fait' && t.due_date && t.due_date >= a.start_date! && t.due_date <= a.end_date!);
+    return snap.tasks.filter((t) => isAssigned(t, a.user_id) && t.status !== 'fait' && t.due_date && t.due_date >= a.start_date! && t.due_date <= a.end_date!);
   }, [a, snap.tasks]);
   if (!draft || !me) return null;
   const admin = isAdmin(me);

@@ -4,6 +4,7 @@ import { uid } from '../data/backend';
 import type { NewMember } from '../data/backend';
 import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, ChecklistItem, Conversation, Doc, LinkFolder, Message, Profile, Project, ProjectTemplate, ReadMark, Snapshot, Task, TaskStatus, UsefulLink } from '../lib/types';
 import { nextOccurrence, shiftIso } from '../lib/recurrence';
+import { assigneesOf, isAssigned, withAssignees } from '../lib/assignees';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useToast } from './toast';
 import { nextColor as nextColorFor } from '../lib/palette';
@@ -162,7 +163,7 @@ function useStoreValue() {
     };
     const tasks: Task[] = tpl.tasks.map((tt) => ({
       id: uid(), project_id: project.id, phase: tt.phase, title: tt.title, note: tt.note,
-      assignee_id: keepAssignees && tt.assignee_id && memberIds.includes(tt.assignee_id) ? tt.assignee_id : null,
+      ...withAssignees(keepAssignees && tt.assignee_id && memberIds.includes(tt.assignee_id) ? [tt.assignee_id] : []),
       due_date: tt.offset_days === null ? null : shiftIso(refDate, tt.offset_days),
       priority: tt.priority, status: 'a_faire', kind: null, centre: null, created_by: me!.id, created_at: now(), done_at: null,
       checklist: tt.checklist.map((text) => ({ id: uid(), text, done: false })), attachments: [], recurrence: null,
@@ -189,7 +190,7 @@ function useStoreValue() {
       phases: [...p.phases], member_ids: [...p.member_ids],
       tasks: snap.tasks.filter((t) => t.project_id === p.id).map((t) => ({
         title: t.title, phase: t.phase, offset_days: off(t.due_date), priority: t.priority,
-        assignee_id: keepAssignees ? t.assignee_id : null, note: t.note, checklist: t.checklist.map((c) => c.text),
+        assignee_id: keepAssignees ? assigneesOf(t)[0] ?? null : null, note: t.note, checklist: t.checklist.map((c) => c.text),
       })),
       created_by: me!.id, created_at: now(),
     };
@@ -295,28 +296,30 @@ function useStoreValue() {
       const where = project ? ` (${project.name})` : '';
       if (existing) {
         const patch = { ...t };
-        const reassigned = t.assignee_id && t.assignee_id !== existing.assignee_id;
+        if (t.assignee_ids) Object.assign(patch, withAssignees(t.assignee_ids));
+        const added = assigneesOf(patch as Task).filter((id) => !isAssigned(existing, id));
         return run(
           (s) => ({ ...s, tasks: s.tasks.map((x) => (x.id === t.id ? { ...x, ...patch } : x)) }),
           async () => {
             await backend.update('tasks', existing.id, patch);
             if (patch.status === 'fait' && existing.status !== 'fait') await spawnNext({ ...existing, ...patch } as Task);
-            if (reassigned) await notify([t.assignee_id!], `${firstName(me!.id)} t’a confié : « ${t.title} »${where}`, project ? `/projets/${project.id}` : '/ma-journee');
+            if (t.assignee_ids && added.length) await notify(added, `${firstName(me!.id)} t’a confié : « ${t.title} »${where}`, project ? `/projets/${project.id}` : '/ma-journee');
           },
           'Tâche mise à jour',
         );
       }
       const row: Task = {
-        id: uid(), project_id: null, phase: null, note: '', assignee_id: me!.id, due_date: null,
+        id: uid(), project_id: null, phase: null, note: '', assignee_id: me!.id, assignee_ids: [me!.id], due_date: null,
         priority: 'Moyenne', status: 'a_faire', kind: null, centre: null,
         created_by: me!.id, created_at: now(), done_at: null, checklist: [], attachments: [], recurrence: null, ...t,
       } as Task;
+      Object.assign(row, withAssignees(t.assignee_ids ?? (t.assignee_id !== undefined ? (t.assignee_id ? [t.assignee_id] : []) : [me!.id])));
       return run(
         (s) => ({ ...s, tasks: [row, ...s.tasks] }),
         async () => {
           await backend.insert('tasks', row);
           if (project) await log(`a ajouté la tâche « ${row.title} »`, project.id);
-          await notify([row.assignee_id ?? ''], `${firstName(me!.id)} t’a confié : « ${row.title} »${where}`, project ? `/projets/${project.id}?tache=${row.id}` : `/taches?tache=${row.id}`);
+          await notify(assigneesOf(row), `${firstName(me!.id)} t’a confié : « ${row.title} »${where}`, project ? `/projets/${project.id}?tache=${row.id}` : `/taches?tache=${row.id}`);
         },
         quiet ? undefined : 'Tâche ajoutée',
       );
@@ -329,10 +332,12 @@ function useStoreValue() {
         async () => {
           await backend.update('tasks', t.id, patch);
           if (status === 'fait') await spawnNext(t);
-          if (status === 'fait' && t.project_id) {
-            await log(`a terminé « ${t.title} »`, t.project_id);
-            if (t.created_by && t.created_by !== t.assignee_id)
-              await notify([t.created_by], `${firstName(me!.id)} a terminé « ${t.title} »`, `/projets/${t.project_id}`);
+          if (status === 'fait') {
+            if (t.project_id) await log(`a terminé « ${t.title} »`, t.project_id);
+            // Tâche partagée : les autres personnes concernées et le créateur sont prévenus.
+            const toWarn = [...assigneesOf(t), t.created_by ?? ''].filter((id) => id && id !== me!.id);
+            if (toWarn.length)
+              await notify(toWarn, `✅ ${firstName(me!.id)} a terminé « ${t.title} »`, t.project_id ? `/projets/${t.project_id}?tache=${t.id}` : `/taches?tache=${t.id}`);
           }
         },
       );
@@ -378,7 +383,7 @@ function useStoreValue() {
         async () => {
           await backend.insert('task_comments', row);
           await notify(mentioned, `${firstName(me!.id)} t’a mentionné(e) sur « ${t.title} »`, link);
-          const others = [t.assignee_id ?? '', t.created_by ?? ''].filter((id) => id && !mentioned.includes(id));
+          const others = [...assigneesOf(t), t.created_by ?? ''].filter((id) => id && !mentioned.includes(id));
           await notify(others, `${firstName(me!.id)} a commenté « ${t.title} »`, link);
         },
       );

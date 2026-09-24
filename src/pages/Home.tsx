@@ -16,6 +16,7 @@ import { conversationName } from '../lib/conversations';
 import { AnnouncementCard } from './Announcements';
 import { PresenceDot, usePresenceText } from '../components/Presence';
 import { absenceKind, absenceOn } from '../lib/absences';
+import { isAssigned } from '../lib/assignees';
 
 export default function Home() {
   const { me, snap, byId, unreadByConv, unreadAnnouncements, mutedConvs, online } = useStore();
@@ -25,7 +26,7 @@ export default function Home() {
   const today = todayIso();
   const in7 = toIso(addDays(new Date(), 7));
 
-  const mine = useMemo(() => snap.tasks.filter((t) => t.assignee_id === me!.id), [snap.tasks, me]);
+  const mine = useMemo(() => snap.tasks.filter((t) => isAssigned(t, me!.id)), [snap.tasks, me]);
   const late = sortTasks(mine.filter(isLate));
   const todays = sortTasks(mine.filter((t) => !isDone(t) && t.due_date === today));
   const week = sortTasks(mine.filter((t) => !isDone(t) && t.due_date && t.due_date > today && t.due_date <= in7));

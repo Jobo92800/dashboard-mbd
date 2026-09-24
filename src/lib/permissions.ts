@@ -1,4 +1,5 @@
 import type { CalEvent, Profile, Project, Snapshot, Task } from './types';
+import { isAssigned } from './assignees';
 
 /**
  * Règles d'accès. Elles sont appliquées deux fois : ici pour l'affichage, et
@@ -18,7 +19,7 @@ export function canSeeTask(me: Profile, t: Task, projects: Project[]) {
     const p = projects.find((x) => x.id === t.project_id);
     return !!p && p.member_ids.includes(me.id);
   }
-  return t.assignee_id === me.id || t.created_by === me.id;
+  return isAssigned(t, me.id) || t.created_by === me.id;
 }
 
 export function canSeeEvent(me: Profile, e: CalEvent) {

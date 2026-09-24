@@ -59,7 +59,8 @@ export interface Task {
   phase: string | null;
   title: string;
   note: string;
-  assignee_id: string | null;
+  assignee_id: string | null; // première personne (compatibilité)
+  assignee_ids: string[]; // toutes les personnes concernées : une seule tâche partagée
   due_date: string | null;
   priority: Priority;
   status: TaskStatus;
