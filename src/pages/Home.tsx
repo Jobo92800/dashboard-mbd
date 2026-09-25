@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { addDays } from 'date-fns';
-import { CalendarClock, CheckCircle2, Plus } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Plus, Video } from 'lucide-react';
 import { useStore } from '../state/store';
 import { fmtLong, fmtStamp, toIso, todayIso } from '../lib/dates';
 import { isDone, isLate, progress, projectHealth, sortTasks } from '../lib/selectors';
@@ -121,15 +121,20 @@ export default function Home() {
             </div>
             {myEvents.length === 0 && <p className="text-sm text-mab-texte">Rien de prévu dans les 7 prochains jours.</p>}
             {myEvents.map((e) => (
-              <div key={e.id} className="flex gap-3 border-b border-mab-filet py-3 last:border-0">
-                <div className="grid w-12 shrink-0 place-items-center rounded-mab-champ bg-mab-wash-2 py-1 text-center">
-                  <CalendarClock size={16} className="text-mab-aqua-texte" />
-                  <span className="text-xs font-semibold text-mab-aqua-texte">{e.time}</span>
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{e.title}</p>
-                  <p className="text-xs text-mab-texte">{e.date === today ? 'Aujourd’hui' : fmtLong(e.date)} · {fmtDur(e.duration_min)} · {e.kind}</p>
-                </div>
+              <div key={e.id} className="flex items-center gap-3 border-b border-mab-filet py-3 last:border-0">
+                <Link to={`/agenda?rdv=${e.id}`} className="flex min-w-0 flex-1 gap-3 hover:opacity-80">
+                  <div className="grid w-12 shrink-0 place-items-center rounded-mab-champ bg-mab-wash-2 py-1 text-center">
+                    <CalendarClock size={16} className="text-mab-aqua-texte" />
+                    <span className="text-xs font-semibold text-mab-aqua-texte">{e.time}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{e.title}</p>
+                    <p className="text-xs text-mab-texte">{e.date === today ? 'Aujourd’hui' : fmtLong(e.date)} · {fmtDur(e.duration_min)} · {e.kind}</p>
+                  </div>
+                </Link>
+                {e.visio_url && e.date === today && (
+                  <a href={e.visio_url} target="_blank" rel="noreferrer" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-mab-pilule bg-mab-aqua-encre px-3 text-xs font-semibold text-white hover:bg-mab-aqua-texte"><Video size={14} /> Rejoindre</a>
+                )}
               </div>
             ))}
           </Card>

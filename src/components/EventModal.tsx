@@ -6,6 +6,7 @@ import { useStore } from '../state/store';
 import { canEditEvent } from '../lib/permissions';
 import { todayIso } from '../lib/dates';
 import { absenceWarning } from '../lib/absences';
+import { normalizeVisio } from '../lib/visio';
 import { Button, Field, Input, Modal, PeoplePicker, Select, Textarea } from './ui';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240];
@@ -22,7 +23,7 @@ export function EventModal({ draft, onClose }: { draft: Partial<CalEvent> | null
   const readOnly = isEdit && !canEditEvent(me, draft as CalEvent);
   const set = (patch: Partial<CalEvent>) => setE((x) => ({ ...x, ...patch }));
   const valid = !!e.title?.trim() && !!e.date;
-  const submit = () => { if (!valid) return; onClose(); saveEvent({ ...e, title: e.title!.trim() } as CalEvent); };
+  const submit = () => { if (!valid) return; onClose(); saveEvent({ ...e, title: e.title!.trim(), visio_url: normalizeVisio(e.visio_url ?? '') } as CalEvent); };
 
   return (
     <Modal
@@ -69,6 +70,13 @@ export function EventModal({ draft, onClose }: { draft: Partial<CalEvent> | null
         {(e.participant_ids ?? []).map((id) => absenceWarning(snap.absences, byId.get(id), e.date, me)).filter(Boolean).map((w) => (
           <p key={w} className="rounded-mab-champ bg-mab-rose-wash px-4 py-2 text-sm text-mab-rose-texte">🌴 {w}</p>
         ))}
+        <Field label="Lien visio (facultatif)" help="Crée la réunion dans ton outil, puis colle le lien ici : un bouton « Rejoindre » apparaîtra dans l’agenda et dans le rappel.">
+          <Input value={e.visio_url ?? ''} onChange={(x) => set({ visio_url: x.target.value })} placeholder="https://meet.google.com/…" inputMode="url" autoCapitalize="off" />
+          <span className="mt-1.5 flex flex-wrap gap-3 text-xs">
+            <a href="https://meet.google.com/new" target="_blank" rel="noreferrer" className="font-medium text-mab-aqua-texte hover:underline">Créer un Google Meet ↗</a>
+            <a href="https://zoom.us/meeting/schedule" target="_blank" rel="noreferrer" className="font-medium text-mab-aqua-texte hover:underline">Planifier un Zoom ↗</a>
+          </span>
+        </Field>
         <Field label="Note / objectif">
           <Textarea value={e.note ?? ''} onChange={(x) => set({ note: x.target.value })} />
         </Field>

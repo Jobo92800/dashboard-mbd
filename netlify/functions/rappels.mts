@@ -38,8 +38,11 @@ export default async () => {
     if (!claimed) continue;
     const people = [...new Set([...(ev.participant_ids ?? []), ev.created_by].filter(Boolean))] as string[];
     const away = new Set((absences ?? []).filter((a) => a.start_date <= ev.date && a.end_date >= ev.date).map((a) => a.user_id));
-    const text = mins <= 1 ? `⏰ Ça commence : ${ev.title} (${ev.time})` : `⏰ Dans ${Math.round(mins)} min : ${ev.title} (${ev.time})`;
-    await notify(people.filter((id) => !away.has(id)).map((user_id) => ({ user_id, text, link: '/agenda', kind: 'rdv' })));
+    const base = mins <= 1 ? `⏰ Ça commence : ${ev.title} (${ev.time})` : `⏰ Dans ${Math.round(mins)} min : ${ev.title} (${ev.time})`;
+    // Avec un lien visio, toucher la notification ouvre directement la réunion.
+    const text = ev.visio_url ? `${base} · touche pour rejoindre la visio` : base;
+    const link = ev.visio_url || `/agenda?rdv=${ev.id}`;
+    await notify(people.filter((id) => !away.has(id)).map((user_id) => ({ user_id, text, link, kind: 'rdv' })));
   }
 
   // ---------- Récap du matin, entre 8 h 00 et 8 h 04 ----------

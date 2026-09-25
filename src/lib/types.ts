@@ -127,6 +127,31 @@ export interface CalEvent {
   note: string;
   created_by: string | null;
   reminded_at?: string | null; // rappel « dans 15 min » déjà envoyé
+  visio_url: string | null; // Meet, Zoom, WhatsApp, Teams…
+  minutes: string; // compte rendu (notes)
+  decisions: Decision[];
+  minutes_by: string | null;
+  minutes_updated_at: string | null;
+}
+
+/** Décision prise en réunion ; peut devenir une tâche (task_id). */
+export interface Decision {
+  id: string;
+  text: string;
+  task_id: string | null;
+}
+
+/** Objectif mensuel d'un centre (tableau de bord, admins). */
+export interface Objective {
+  id: string; // « AAAA-MM:Centre »
+  month: string;
+  centre: string;
+  leads: number | null;
+  bilans: number | null;
+  conversions: number | null;
+  ca: number | null;
+  updated_by: string | null;
+  updated_at: string;
 }
 
 /** Catégorie d'une notification : sert aux préférences « ce qui sonne sur mon téléphone ». */
@@ -306,6 +331,7 @@ export interface Snapshot {
   link_folders: LinkFolder[];
   links: UsefulLink[];
   last_seen: LastSeen[];
+  objectives: Objective[];
 }
 
 export type Table = keyof Snapshot;

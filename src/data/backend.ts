@@ -32,6 +32,8 @@ export interface Backend {
   /** Enregistre / retire cet appareil pour les notifications push. */
   savePushSubscription(sub: { endpoint: string; p256dh: string; auth: string; user_agent: string }): Promise<void>;
   deletePushSubscription(endpoint: string): Promise<void>;
+  /** Lien secret d'abonnement à l'agenda (nouveau lien si reset). */
+  calendarToken(reset?: boolean): Promise<string>;
   /** Jeton de session, pour appeler les fonctions serveur. */
   accessToken(): Promise<string>;
   inviteMember(m: NewMember): Promise<{ tempPassword?: string }>;

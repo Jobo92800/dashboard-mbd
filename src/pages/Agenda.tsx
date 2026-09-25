@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
+import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CalendarPlus, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, ChevronRight, Download, FileText, RefreshCcw, Video } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { EventSheet } from '../components/EventSheet';
+import { CalendarSync } from '../components/CalendarSync';
 import { useStore } from '../state/store';
 import type { CalEvent } from '../lib/types';
 import { fmtLong, toIso, todayIso } from '../lib/dates';
@@ -22,6 +25,16 @@ export default function Agenda() {
   const [person, setPerson] = useState('');
   const [eventDraft, setEventDraft] = useState<Partial<CalEvent> | null>(null);
   const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [params, setParams] = useSearchParams();
+  // Lien direct vers un rendez-vous (notification « compte rendu », Ma journée…)
+  useEffect(() => {
+    const id = params.get('rdv');
+    const ev = id && snap.events.find((x) => x.id === id);
+    if (ev) { setSheetId(ev.id); setDay(ev.date); setCursor(startOfMonth(parseISO(ev.date))); params.delete('rdv'); setParams(params, { replace: true }); }
+  }, [params, snap.events, setParams]);
+  const sheet = snap.events.find((x) => x.id === sheetId);
 
   const days = eachDayOfInterval({ start: startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 }), end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 }) });
   const tasks = useMemo(() => snap.tasks.filter((t) => t.due_date && (!person || isAssigned(t, person))), [snap.tasks, person]);
@@ -53,7 +66,8 @@ export default function Agenda() {
   return (
     <>
       <PageTitle title={<>Agenda & <b>échéances</b></>} sub="Deadlines des projets, tâches rapides et réunions de l’équipe.">
-        <Button onClick={exportIcs} title="Télécharger mes événements pour Google Agenda / iPhone" className="max-sm:!px-4"><Download size={16} /><span className="max-sm:hidden"> Exporter (.ics)</span></Button>
+        <Button onClick={() => setSyncOpen(true)} className="max-sm:!px-4"><RefreshCcw size={16} /><span className="max-sm:hidden"> Synchroniser avec mon téléphone</span></Button>
+        <Button variant="discret" onClick={exportIcs} title="Télécharger une copie de mes événements (.ics)" className="max-sm:hidden"><Download size={16} /></Button>
         <Button variant="primaire" onClick={() => setEventDraft({ date: day })}><CalendarPlus size={17} /> Nouvel événement</Button>
       </PageTitle>
 
@@ -143,8 +157,12 @@ export default function Agenda() {
           <h3 className="mb-1 mt-4 text-xs font-semibold uppercase tracking-[.12em] text-mab-aqua-texte">Événements · {dayEvents.length}</h3>
           {dayEvents.length === 0 && <p className="py-2 text-sm text-mab-gris-doux">Aucun.</p>}
           {dayEvents.map((e) => (
-            <button key={e.id} onClick={() => setEventDraft(e)} className="block w-full border-b border-mab-filet py-3 text-left last:border-0 hover:bg-mab-wash">
-              <p className="font-medium">{e.time} · {e.title}</p>
+            <button key={e.id} onClick={() => setSheetId(e.id)} className="block w-full border-b border-mab-filet py-3 text-left last:border-0 hover:bg-mab-wash">
+              <p className="flex items-center gap-1.5 font-medium">
+                {e.time} · {e.title}
+                {e.visio_url && <Video size={14} className="shrink-0 text-mab-aqua-texte" aria-label="Visio" />}
+                {(e.minutes.trim() || e.decisions.length > 0) && <FileText size={14} className="shrink-0 text-mab-violet-texte" aria-label="Compte rendu" />}
+              </p>
               <p className="mb-1.5 text-xs text-mab-texte">{e.kind} · {fmtDur(e.duration_min)}{e.note ? ` · ${e.note}` : ''}</p>
               <AvatarStack people={e.participant_ids.map((x) => byId.get(x))} size={24} />
             </button>
@@ -156,6 +174,15 @@ export default function Agenda() {
       </div>
 
       <EventModal draft={eventDraft} onClose={() => setEventDraft(null)} />
+      {sheet && !eventDraft && !taskDraft && (
+        <EventSheet
+          event={sheet}
+          onClose={() => setSheetId(null)}
+          onEdit={() => setEventDraft(sheet)}
+          onOpenTask={(tid) => { const t = snap.tasks.find((x) => x.id === tid); if (t) setTaskDraft(t); }}
+        />
+      )}
+      <CalendarSync open={syncOpen} onClose={() => setSyncOpen(false)} />
       <TaskModal draft={taskDraft} onClose={() => setTaskDraft(null)} />
     </>
   );

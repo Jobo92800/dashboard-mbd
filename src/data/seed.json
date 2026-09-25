@@ -1432,7 +1432,23 @@
     "u-jo"
    ],
    "note": "Vérifier les actions critiques avant lancement.",
-   "created_by": "u-nico"
+   "created_by": "u-nico",
+   "visio_url": "https://meet.google.com/abc-defg-hij",
+   "minutes": "## Points abordés\n- Tracking Meta vérifié, OK\n- La landing page doit être relue sur mobile\n\n## À surveiller\n- Délai de réponse aux inscrits < 24 h",
+   "decisions": [
+    {
+     "id": "d1",
+     "text": "Relire la landing page sur mobile avant vendredi",
+     "task_id": null
+    },
+    {
+     "id": "d2",
+     "text": "Préparer 3 visuels de relance J-3",
+     "task_id": null
+    }
+   ],
+   "minutes_by": "u-nico",
+   "minutes_updated_at": "2026-09-24T09:20:00.000Z"
   },
   {
    "id": "e-e2",
@@ -1447,7 +1463,12 @@
     "u-marie"
    ],
    "note": "Informations réseau et priorités opérationnelles.",
-   "created_by": "u-nico"
+   "created_by": "u-nico",
+   "visio_url": null,
+   "minutes": "",
+   "decisions": [],
+   "minutes_by": null,
+   "minutes_updated_at": null
   }
  ],
  "notifications": [],

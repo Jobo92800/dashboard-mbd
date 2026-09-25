@@ -24,13 +24,14 @@ function read(): Snapshot {
 function normalize(raw: Partial<Snapshot>): Snapshot {
   const s = {
     conversations: [], messages: [], reads: [], task_comments: [], templates: [],
-    reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [], last_seen: [], ...raw,
+    reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [], last_seen: [], objectives: [], ...raw,
   } as Snapshot;
   s.messages = s.messages.map((m) => ({ ...m, reply_to: m.reply_to ?? null, attachments: m.attachments ?? [], edited_at: m.edited_at ?? null }));
   s.conversations = s.conversations.map((c) => ({
     ...c, pinned_ids: c.pinned_ids ?? [], avatar_url: c.avatar_url ?? null, description: c.description ?? '',
     admin_ids: c.admin_ids ?? (c.created_by ? [c.created_by] : []),
   }));
+  s.events = s.events.map((e) => ({ ...e, visio_url: e.visio_url ?? null, minutes: e.minutes ?? '', decisions: e.decisions ?? [], minutes_by: e.minutes_by ?? null, minutes_updated_at: e.minutes_updated_at ?? null }));
   s.reads = s.reads.map((r) => ({ ...r, muted: r.muted ?? false, pinned: r.pinned ?? false }));
   s.tasks = s.tasks.map((t) => ({ ...t, checklist: t.checklist ?? [], attachments: t.attachments ?? [], recurrence: t.recurrence ?? null, assignee_ids: t.assignee_ids?.length ? t.assignee_ids : t.assignee_id ? [t.assignee_id] : [] }));
   s.profiles = s.profiles.map((p) => ({ ...p, recap_email: p.recap_email ?? true, avatar_url: p.avatar_url ?? null, notif_prefs: p.notif_prefs ?? {} }));
@@ -156,6 +157,10 @@ export const demoBackend: Backend = {
   },
 
   async deletePushSubscription() {},
+
+  async calendarToken() {
+    throw new Error('La synchronisation d’agenda fonctionne sur l’appli en ligne, pas en démo.');
+  },
 
   async accessToken() {
     return '';

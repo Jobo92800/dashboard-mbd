@@ -291,7 +291,7 @@ function Notifications() {
             {list.map((n) => (
               <button
                 key={n.id}
-                onClick={() => { markRead(n.id); setOpen(false); if (n.link) nav(n.link); }}
+                onClick={() => { markRead(n.id); setOpen(false); if (n.link?.startsWith('http')) window.open(n.link, '_blank', 'noopener'); else if (n.link) nav(n.link); }}
                 className={`flex w-full gap-3 border-b border-mab-filet px-4 py-3 text-left last:border-0 hover:bg-mab-wash ${n.read ? '' : 'bg-mab-wash-2/60'}`}
               >
                 <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? 'bg-transparent' : 'bg-mab-rose'}`} />

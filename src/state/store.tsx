@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { backend } from '../data';
 import { uid } from '../data/backend';
 import type { NewMember } from '../data/backend';
-import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, ChecklistItem, Conversation, Doc, LinkFolder, Message, Profile, Project, ProjectTemplate, NotifKind, ReadMark, Snapshot, Task, TaskStatus, UsefulLink } from '../lib/types';
+import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, Decision, Objective, ChecklistItem, Conversation, Doc, LinkFolder, Message, Profile, Project, ProjectTemplate, NotifKind, ReadMark, Snapshot, Task, TaskStatus, UsefulLink } from '../lib/types';
 import { nextOccurrence, shiftIso } from '../lib/recurrence';
 import { assigneesOf, isAssigned, withAssignees } from '../lib/assignees';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
@@ -14,7 +14,7 @@ type AttachmentInput = { file?: File; name?: string; url?: string };
 const EMPTY: Snapshot = {
   profiles: [], projects: [], tasks: [], comments: [], events: [], notifications: [], activity: [],
   conversations: [], messages: [], reads: [], task_comments: [], templates: [],
-  reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [], last_seen: [],
+  reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [], last_seen: [], objectives: [],
 };
 const now = () => new Date().toISOString();
 
@@ -470,6 +470,43 @@ function useStoreValue() {
         },
         'Événement enregistré',
       );
+    },
+
+    // ---------- Comptes rendus de réunion ----------
+    saveMinutes(e: CalEvent, patch: { minutes?: string; decisions?: Decision[] }, okText?: string) {
+      const full = { ...patch, minutes_by: me!.id, minutes_updated_at: now() };
+      return run(
+        (s) => ({ ...s, events: s.events.map((x) => (x.id === e.id ? { ...x, ...full } : x)) }),
+        () => backend.update('events', e.id, full),
+        okText,
+      );
+    },
+
+    /** Une décision devient une tâche (partagée si plusieurs personnes), liée au compte rendu. */
+    async decisionToTask(e: CalEvent, d: Decision, opts: { assignees: string[]; due: string | null }) {
+      const taskId = uid();
+      const day = e.date.split('-').reverse().slice(0, 2).join('/');
+      await actions.saveTask({
+        id: taskId, title: d.text, due_date: opts.due, kind: 'Réunion',
+        note: `Décidé lors de « ${e.title} » du ${day}.`,
+        ...withAssignees(opts.assignees),
+      } as Task, true);
+      const current = snapRef.current.events.find((x) => x.id === e.id) ?? e;
+      await actions.saveMinutes(current, { decisions: current.decisions.map((x) => (x.id === d.id ? { ...x, task_id: taskId } : x)) },
+        opts.assignees.length > 1 ? `Tâche partagée entre ${opts.assignees.length} personnes` : 'Tâche créée');
+      return taskId;
+    },
+
+    /** Prévient les participants que le compte rendu est prêt. */
+    shareMinutes(e: CalEvent) {
+      const people = [...e.participant_ids, e.created_by ?? ''];
+      const day = e.date.split('-').reverse().slice(0, 2).join('/');
+      return run((s) => s, () => notify(people, `📝 Compte rendu de « ${e.title} » (${day}) disponible`, `/agenda?rdv=${e.id}`, 'rdv'), 'Compte rendu partagé avec les participants');
+    },
+
+    saveObjective(o: Omit<Objective, 'updated_by' | 'updated_at'>) {
+      const row = { ...o, updated_by: me!.id, updated_at: now() } as Objective;
+      return run((s) => ({ ...s, objectives: [...s.objectives.filter((x) => x.id !== o.id), row] }), () => backend.upsert('objectives', row), 'Objectif enregistré');
     },
 
     deleteEvent(e: CalEvent) {

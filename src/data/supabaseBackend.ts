@@ -12,7 +12,7 @@ function clean<T extends object>(row: T): T {
 const TABLES: Table[] = [
   'profiles', 'projects', 'tasks', 'comments', 'events', 'notifications', 'activity',
   'conversations', 'messages', 'reads', 'task_comments', 'templates',
-  'reactions', 'announcements', 'announcement_reads', 'docs', 'absences', 'link_folders', 'links', 'last_seen',
+  'reactions', 'announcements', 'announcement_reads', 'docs', 'absences', 'link_folders', 'links', 'last_seen', 'objectives',
 ];
 /** « last_seen » change souvent : on ne recharge pas tout l'écran pour ça. */
 const LIVE_TABLES = TABLES.filter((t) => t !== 'last_seen');
@@ -130,6 +130,17 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
 
     async deletePushSubscription(endpoint) {
       check((await sb.from('push_subscriptions').delete().eq('endpoint', endpoint)).error);
+    },
+
+    async calendarToken(reset = false) {
+      const { data: u } = await sb.auth.getUser();
+      const uidMe = u.user!.id;
+      if (reset) check((await sb.from('calendar_tokens').delete().eq('user_id', uidMe)).error);
+      const { data } = await sb.from('calendar_tokens').select('token').eq('user_id', uidMe).maybeSingle();
+      if (data?.token) return data.token as string;
+      const ins = await sb.from('calendar_tokens').insert({ user_id: uidMe }).select('token').single();
+      check(ins.error);
+      return ins.data!.token as string;
     },
 
     async accessToken() {

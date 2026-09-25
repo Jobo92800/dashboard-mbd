@@ -1,5 +1,5 @@
 // MA HQ · service worker : ouverture rapide, écran hors ligne, notifications.
-const CACHE = 'mahq-v2';
+const CACHE = 'mahq-v3';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/mabeautyplus-lotus.svg'];
 
 self.addEventListener('install', (e) => {
@@ -39,6 +39,11 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const target = e.notification.data?.url || '/';
+  // Lien externe (visio) : ouvert directement, sans quitter l'appli.
+  if (/^https?:/.test(target) && !target.startsWith(self.location.origin)) {
+    e.waitUntil(self.clients.openWindow(target));
+    return;
+  }
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const c of list) {
