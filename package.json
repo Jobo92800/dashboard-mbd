@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "db:status": "supabase migration list",
     "db:push": "supabase db push",
-    "notifications:configurer": "node scripts/configurer-notifications.mjs"
+    "notifications:configurer": "node scripts/configurer-notifications.mjs",
+    "airtable:configurer": "node scripts/configurer-airtable.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, CalendarDays, FolderKanban, Link2, ListChecks, LogOut, Megaphone, Menu, MessagesSquare, Palmtree, Search, ShieldCheck, Sun, Users } from 'lucide-react';
+import { BarChart3, Bell, BookOpen, CalendarDays, FolderKanban, Link2, ListChecks, LogOut, Megaphone, Menu, MessagesSquare, Palmtree, Search, ShieldCheck, Sun, Users } from 'lucide-react';
 import { useStore } from '../state/store';
 import { isAdmin } from '../lib/permissions';
 import { fmtStamp, todayIso } from '../lib/dates';
@@ -73,6 +73,12 @@ export function Layout({ children }: { children: ReactNode }) {
       {isAdmin(me) && (
         <>
           <p className="mb-1 mt-6 px-3 text-[11px] font-semibold uppercase tracking-[.14em] text-mab-profond-source">Administration</p>
+          <NavLink
+            to="/tableau"
+            className={({ isActive }) => `flex items-center gap-3 rounded-mab-champ px-3 py-2.5 text-[15px] font-medium transition ${isActive ? 'bg-white/15 text-white' : 'text-mab-profond-texte hover:bg-white/10'}`}
+          >
+            <BarChart3 size={19} /> Tableau de bord
+          </NavLink>
           <NavLink
             to="/admin"
             className={({ isActive }) => `flex items-center gap-3 rounded-mab-champ px-3 py-2.5 text-[15px] font-medium transition ${isActive ? 'bg-white/15 text-white' : 'text-mab-profond-texte hover:bg-white/10'}`}

@@ -88,6 +88,16 @@ expliquer en français, sans jargon.
   (false = coupé ; mentions toujours envoyées), `events.reminded_at`. Fonction
   planifiée `rappels` (*/5) : rappel 15 min avant chaque rendez-vous et récap
   à 8 h Paris. Déplacement / annulation de rendez-vous notifiés.
+- Réunions & agenda (migration 013) : `events.visio_url / minutes / decisions`,
+  participants autorisés à rédiger le compte rendu (trigger `protect_event`),
+  décision → tâche (`decisionToTask`). Flux iCal personnel : fonction `agenda`
+  (`calendar_tokens`, lien secret, `&taches=1`).
+- Tableau de bord : fonction `tableau` (admins) lit Airtable base « CRM 2026 »
+  `appNML7rJEKiWkuVg`, tables Prospects Master `tblgCdNITlPy74Z5G` + Perdu
+  `tblSyB6j2gvKtvo4Y`. Centre harmonisé (`centreOf`). Prospects = Création,
+  bilans = Date Bilan Placé, cures = Date Converti (repli Date de convertion),
+  CA = Montant Cure. Jeton `AIRTABLE_TOKEN` posé par Jonathan via
+  `npm run airtable:configurer`. Objectifs en base (`objectives`, admins).
 - Mise en production : tester en démo → valider 004 en transaction annulée →
   demander à Jonathan → `db:push` → aperçu Netlify → production.
 
