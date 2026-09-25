@@ -151,6 +151,12 @@ export const demoBackend: Backend = {
     write(s);
   },
 
+  async savePushSubscription() {
+    throw new Error('Les notifications sur le téléphone fonctionnent sur l’appli en ligne, pas en démo.');
+  },
+
+  async deletePushSubscription() {},
+
   async accessToken() {
     return '';
   },

@@ -76,6 +76,13 @@ expliquer en français, sans jargon.
   première personne (compatibilité). Toujours passer par `assigneesOf` /
   `isAssigned` / `withAssignees` (`src/lib/assignees.ts`). Une tâche confiée à
   plusieurs = UNE tâche, cochée pour tous ; fin → les autres sont prévenus.
+- Notifications push (migration 011) : `push_subscriptions` (un appareil = un
+  endpoint), triggers pg_net sur `notifications` et `messages` → fonction
+  Netlify `push` (relit la ligne avec la clé serveur, marque `pushed_at`,
+  respecte sourdine, exclut les @mentionnés déjà notifiés). Clés VAPID créées
+  par Jonathan via `npm run notifications:configurer` (jamais vues par Claude).
+  iPhone : appli installée obligatoire. `pushActiveHere()` évite les doublons
+  avec les alertes internes.
 - Mise en production : tester en démo → valider 004 en transaction annulée →
   demander à Jonathan → `db:push` → aperçu Netlify → production.
 

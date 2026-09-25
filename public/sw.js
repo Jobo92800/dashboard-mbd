@@ -1,5 +1,5 @@
 // MA HQ · service worker : ouverture rapide, écran hors ligne, notifications.
-const CACHE = 'mahq-v1';
+const CACHE = 'mahq-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/mabeautyplus-lotus.svg'];
 
 self.addEventListener('install', (e) => {
@@ -49,15 +49,23 @@ self.addEventListener('notificationclick', (e) => {
   );
 });
 
-// Notifications envoyées par le serveur (Web Push), actives une fois la base branchée.
+// Notifications envoyées par le serveur (Web Push) : arrivent même appli fermée.
 self.addEventListener('push', (e) => {
-  const data = e.data ? e.data.json() : {};
-  e.waitUntil(
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch { data = { body: e.data ? e.data.text() : '' }; }
+  const tasks = [
     self.registration.showNotification(data.title || 'MA HQ', {
       body: data.body || '',
       icon: '/icon-192.png',
       badge: '/icon-192.png',
+      tag: data.tag || undefined, // une seule notification par conversation, mise à jour
+      renotify: !!data.tag,
       data: { url: data.url || '/' },
     }),
-  );
+  ];
+  // Pastille sur l'icône de l'appli (iPhone installé, Android, ordinateur).
+  if (typeof data.count === 'number' && self.navigator && 'setAppBadge' in self.navigator) {
+    tasks.push(data.count > 0 ? self.navigator.setAppBadge(data.count) : self.navigator.clearAppBadge());
+  }
+  e.waitUntil(Promise.all(tasks).catch(() => {}));
 });

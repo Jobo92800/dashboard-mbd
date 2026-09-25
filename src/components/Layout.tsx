@@ -13,6 +13,7 @@ import { NameSetup } from './NameSetup';
 import { useToast } from '../state/toast';
 import { setAppBadge, showSystemNotification, useInstall } from '../lib/device';
 import { playSound } from '../lib/sounds';
+import { pushActiveHere } from '../lib/push';
 import { isAssigned } from '../lib/assignees';
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -171,7 +172,7 @@ function MessageWatcher() {
       if (loc.pathname === url && !away()) continue;
       const who = byId.get(m.author_id)?.full_name.split(' ')[0] ?? 'Quelqu’un';
       const text = m.body.length > 90 ? m.body.slice(0, 90) + '…' : m.body;
-      if (away()) showSystemNotification(`💬 ${who}`, text, url);
+      if (away()) { if (!pushActiveHere()) showSystemNotification(`💬 ${who}`, text, url); }
       else toast(`💬 ${who} : ${text.slice(0, 60)}`);
     }
   }, [snap.messages, loaded, me?.id, byId, loc.pathname, toast, mutedConvs]);
@@ -184,7 +185,7 @@ function MessageWatcher() {
       seenNotif.current.add(n.id);
       if (n.read) continue;
       playSound(n.text.startsWith('📣') || n.text.startsWith('⏰ À lire') ? 'annonce' : 'notification');
-      if (away()) showSystemNotification('MA HQ', n.text, n.link ?? '/');
+      if (away()) { if (!pushActiveHere()) showSystemNotification('MA HQ', n.text, n.link ?? '/'); }
       else toast(`🔔 ${n.text}`);
     }
   }, [snap.notifications, loaded, toast]);

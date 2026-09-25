@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "db:status": "supabase migration list",
-    "db:push": "supabase db push"
+    "db:push": "supabase db push",
+    "notifications:configurer": "node scripts/configurer-notifications.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",
@@ -16,13 +17,15 @@
     "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@netlify/functions": "^6.0.0",
     "@types/node": "^26.6.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.6.1",
     "postcss": "^8.5.28",

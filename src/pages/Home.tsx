@@ -15,6 +15,7 @@ import { fmtDur } from '../components/EventModal';
 import { conversationName } from '../lib/conversations';
 import { AnnouncementCard } from './Announcements';
 import { PresenceDot, usePresenceText } from '../components/Presence';
+import { PushInvite } from '../components/PushInvite';
 import { absenceKind, absenceOn } from '../lib/absences';
 import { isAssigned } from '../lib/assignees';
 
@@ -67,6 +68,8 @@ export default function Home() {
           <span className="text-mab-aqua-texte">Lire →</span>
         </Link>
       )}
+
+      <PushInvite />
 
       <Card className="mb-6 px-5 py-4">
         <Surtitre className="mb-2.5">Mon statut pour l’équipe</Surtitre>

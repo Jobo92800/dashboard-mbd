@@ -29,6 +29,9 @@ export interface Backend {
   uploadAvatar(image: Blob, folder: string): Promise<string>;
   /** Crée ou remplace la ligne portant cet id. */
   upsert<T extends Table>(table: T, row: Snapshot[T][number]): Promise<void>;
+  /** Enregistre / retire cet appareil pour les notifications push. */
+  savePushSubscription(sub: { endpoint: string; p256dh: string; auth: string; user_agent: string }): Promise<void>;
+  deletePushSubscription(endpoint: string): Promise<void>;
   /** Jeton de session, pour appeler les fonctions serveur. */
   accessToken(): Promise<string>;
   inviteMember(m: NewMember): Promise<{ tempPassword?: string }>;

@@ -3,10 +3,11 @@ import { BellRing, Mail, Share, Smartphone, Volume2 } from 'lucide-react';
 import { useStore } from '../state/store';
 import { useToast } from '../state/toast';
 import { backend } from '../data';
-import { disableNotifications, enableNotifications, notifEnabled, notifSupported, showSystemNotification, useInstall } from '../lib/device';
+import { disableNotifications, enableNotifications, notifEnabled, notifSupported, useInstall } from '../lib/device';
 import { fridayReport, weeklyRecap, type Email } from '../lib/recap';
 import { isAdmin } from '../lib/permissions';
 import { playSound, setSoundsEnabled, soundsEnabled } from '../lib/sounds';
+import { disablePush, enablePush, pushState, sendTestPush, type PushState } from '../lib/push';
 import { Button, Card, Modal, Surtitre } from './ui';
 
 function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -62,24 +63,7 @@ export function DeviceCard() {
           )}
         </div>
       </div>
-      <div className="flex items-start gap-4">
-        <BellRing size={22} className="mt-0.5 shrink-0 text-mab-aqua-texte" />
-        <div className="flex-1">
-          <p className="font-semibold">Notifications</p>
-          <p className="text-sm text-mab-texte">
-            {notifSupported()
-              ? 'Tâche confiée, @mention, nouveau message, invitation à une réunion : prévenu(e) même quand MA HQ est en arrière-plan.'
-              : 'Ce navigateur ne gère pas les notifications. Sur iPhone : installe d’abord l’appli (ci-dessus).'}
-          </p>
-          <p className="mt-1 text-xs text-mab-gris-doux">Tant que la base de données n’est pas branchée, elles arrivent quand l’appli est ouverte dans un onglet ; ensuite, même appli fermée.</p>
-          {on && (
-            <Button variant="discret" className="mt-1 !px-0" onClick={() => showSystemNotification('MA HQ', 'Les notifications fonctionnent sur cet appareil ✨', '/')}>
-              Envoyer une notification d’essai
-            </Button>
-          )}
-        </div>
-        {notifSupported() && <Toggle on={on} onChange={toggle} label="Activer les notifications" />}
-      </div>
+      <PushSection fallbackOn={on} onFallbackToggle={toggle} />
       <div className="flex items-start gap-4">
         <Volume2 size={22} className="mt-0.5 shrink-0 text-mab-aqua-texte" />
         <div className="flex-1">
@@ -151,5 +135,69 @@ export function EmailCard() {
         </Modal>
       )}
     </Card>
+  );
+}
+
+/** Notifications sur le téléphone : état de l'appareil et bouton d'activation. */
+function PushSection({ fallbackOn, onFallbackToggle }: { fallbackOn: boolean; onFallbackToggle: (v: boolean) => void }) {
+  const { mode } = useStore();
+  const toast = useToast();
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { pushState().then(setState); }, []);
+
+  if (mode === 'demo') {
+    return (
+      <div className="flex items-start gap-4">
+        <BellRing size={22} className="mt-0.5 shrink-0 text-mab-aqua-texte" />
+        <div className="flex-1">
+          <p className="font-semibold">Notifications</p>
+          <p className="text-sm text-mab-texte">En démo, elles arrivent seulement quand l’appli est ouverte. Sur l’appli en ligne : de vraies notifications, même appli fermée.</p>
+        </div>
+        {notifSupported() && <Toggle on={fallbackOn} onChange={onFallbackToggle} label="Activer les notifications" />}
+      </div>
+    );
+  }
+
+  const run = async (fn: () => Promise<unknown>, ok?: string) => {
+    setBusy(true);
+    try { await fn(); if (ok) toast(ok); } catch (e) { toast((e as Error).message, 'erreur'); }
+    finally { setBusy(false); setState(await pushState()); }
+  };
+
+  return (
+    <div className="flex items-start gap-4">
+      <BellRing size={22} className="mt-0.5 shrink-0 text-mab-aqua-texte" />
+      <div className="flex-1">
+        <p className="font-semibold">Notifications sur cet appareil</p>
+        {state === 'actif' && (
+          <>
+            <p className="text-sm text-mab-texte">✅ Actives : tâches confiées, @mentions, messages, annonces, absences… même quand MA HQ est fermée. Les conversations en sourdine ne sonnent pas.</p>
+            <Button variant="discret" className="mt-1 !px-0" disabled={busy} onClick={() => run(async () => { const n = await sendTestPush(); toast(`Notification d’essai envoyée (${n} appareil${n > 1 ? 's' : ''})`); })}>
+              Envoyer une notification d’essai
+            </Button>
+          </>
+        )}
+        {state === 'inactif' && <p className="text-sm text-mab-texte">Recevoir les notifications de MA HQ sur cet appareil, même quand l’appli est fermée, avec le son et la pastille sur l’icône.</p>}
+        {state === 'installer_iphone' && (
+          <p className="text-sm text-mab-texte">
+            Sur iPhone, les notifications ne marchent que depuis l’appli installée : dans Safari, touche <Share size={14} className="inline align-text-bottom" /> <b>Partager</b> → <b>« Sur l’écran d’accueil »</b>, puis ouvre MA HQ depuis son icône et reviens ici.
+          </p>
+        )}
+        {state === 'refuse' && (
+          <p className="text-sm text-mab-texte">
+            Les notifications ont été refusées sur cet appareil. Pour les réactiver : iPhone → <b>Réglages → Notifications → MA HQ</b> ; Android → appui long sur l’icône → <b>Infos → Notifications</b> ; ordinateur → le cadenas à gauche de l’adresse.
+          </p>
+        )}
+        {state === 'indisponible' && <p className="text-sm text-mab-texte">Ce navigateur ne permet pas les notifications. Essaie avec Chrome, Edge ou Safari à jour.</p>}
+      </div>
+      {(state === 'actif' || state === 'inactif') && (
+        <Toggle
+          on={state === 'actif'}
+          label="Recevoir les notifications sur cet appareil"
+          onChange={(v) => run(v ? enablePush : disablePush, v ? 'Notifications activées sur cet appareil' : 'Notifications désactivées sur cet appareil')}
+        />
+      )}
+    </div>
   );
 }

@@ -123,6 +123,15 @@ export function makeSupabaseBackend(url: string, anonKey: string): Backend {
       check((await sb.from(table).delete().eq('id', id)).error);
     },
 
+    async savePushSubscription(sub) {
+      const { data } = await sb.auth.getUser();
+      check((await sb.from('push_subscriptions').upsert({ ...sub, user_id: data.user!.id }, { onConflict: 'endpoint' })).error);
+    },
+
+    async deletePushSubscription(endpoint) {
+      check((await sb.from('push_subscriptions').delete().eq('endpoint', endpoint)).error);
+    },
+
     async accessToken() {
       const { data } = await sb.auth.getSession();
       return data.session?.access_token ?? '';
