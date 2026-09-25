@@ -83,6 +83,11 @@ expliquer en français, sans jargon.
   par Jonathan via `npm run notifications:configurer` (jamais vues par Claude).
   iPhone : appli installée obligatoire. `pushActiveHere()` évite les doublons
   avec les alertes internes.
+- Notifications complètes (migration 012) : `notifications.kind` (tache, message,
+  mention, rdv, annonce, absence, projet, matin), `profiles.notif_prefs`
+  (false = coupé ; mentions toujours envoyées), `events.reminded_at`. Fonction
+  planifiée `rappels` (*/5) : rappel 15 min avant chaque rendez-vous et récap
+  à 8 h Paris. Déplacement / annulation de rendez-vous notifiés.
 - Mise en production : tester en démo → valider 004 en transaction annulée →
   demander à Jonathan → `db:push` → aperçu Netlify → production.
 

@@ -8,6 +8,7 @@ import { fridayReport, weeklyRecap, type Email } from '../lib/recap';
 import { isAdmin } from '../lib/permissions';
 import { playSound, setSoundsEnabled, soundsEnabled } from '../lib/sounds';
 import { disablePush, enablePush, pushState, sendTestPush, type PushState } from '../lib/push';
+import { NOTIF_PREFS, type NotifKind } from '../lib/types';
 import { Button, Card, Modal, Surtitre } from './ui';
 
 function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -64,6 +65,7 @@ export function DeviceCard() {
         </div>
       </div>
       <PushSection fallbackOn={on} onFallbackToggle={toggle} />
+      <NotifPrefs />
       <div className="flex items-start gap-4">
         <Volume2 size={22} className="mt-0.5 shrink-0 text-mab-aqua-texte" />
         <div className="flex-1">
@@ -198,6 +200,31 @@ function PushSection({ fallbackOn, onFallbackToggle }: { fallbackOn: boolean; on
           onChange={(v) => run(v ? enablePush : disablePush, v ? 'Notifications activées sur cet appareil' : 'Notifications désactivées sur cet appareil')}
         />
       )}
+    </div>
+  );
+}
+
+/** Ce qui sonne sur mes appareils (réglage valable pour tous mes appareils). */
+function NotifPrefs() {
+  const { me, updateProfile } = useStore();
+  if (!me) return null;
+  const prefs = me.notif_prefs ?? {};
+  const set = (k: NotifKind, v: boolean) => updateProfile(me.id, { notif_prefs: { ...prefs, [k]: v } });
+  return (
+    <div className="ml-10 rounded-mab-champ border border-mab-filet p-3 sm:p-4">
+      <p className="mb-2 text-sm font-semibold">Me prévenir pour…</p>
+      <div className="grid gap-1">
+        {NOTIF_PREFS.map((c) => (
+          <div key={c.id} className="flex items-center gap-3 py-1.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{c.label}</p>
+              <p className="text-xs text-mab-texte">{c.help}</p>
+            </div>
+            <Toggle on={prefs[c.id] !== false} onChange={(v) => set(c.id, v)} label={c.label} />
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-mab-gris-doux">Les @mentions te préviennent toujours. Tout reste visible dans la cloche 🔔 de l’appli.</p>
     </div>
   );
 }

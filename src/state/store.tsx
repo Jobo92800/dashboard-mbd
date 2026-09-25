@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { backend } from '../data';
 import { uid } from '../data/backend';
 import type { NewMember } from '../data/backend';
-import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, ChecklistItem, Conversation, Doc, LinkFolder, Message, Profile, Project, ProjectTemplate, ReadMark, Snapshot, Task, TaskStatus, UsefulLink } from '../lib/types';
+import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, ChecklistItem, Conversation, Doc, LinkFolder, Message, Profile, Project, ProjectTemplate, NotifKind, ReadMark, Snapshot, Task, TaskStatus, UsefulLink } from '../lib/types';
 import { nextOccurrence, shiftIso } from '../lib/recurrence';
 import { assigneesOf, isAssigned, withAssignees } from '../lib/assignees';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
@@ -103,11 +103,12 @@ function useStoreValue() {
   const log = (text: string, project_id: string | null) =>
     backend.insert('activity', { id: uid(), actor_id: me!.id, project_id, text, created_at: now() });
 
-  const notify = (userIds: string[], text: string, link: string | null) =>
+  /** Crée une notification (et donc une notification sur le téléphone, selon les préférences de chacun). */
+  const notify = (userIds: string[], text: string, link: string | null, kind: NotifKind = 'autre') =>
     Promise.all(
       [...new Set(userIds)]
         .filter((id) => id && id !== me!.id)
-        .map((user_id) => backend.insert('notifications', { id: uid(), user_id, text, link, read: false, created_at: now() })),
+        .map((user_id) => backend.insert('notifications', { id: uid(), user_id, text, link, read: false, created_at: now(), kind })),
     );
 
   /** Tâche récurrente terminée : on prépare la suivante (sauf si elle existe déjà). */
@@ -174,7 +175,7 @@ function useStoreValue() {
         await backend.insert('projects', project);
         await backend.insertMany('tasks', tasks);
         await log(`a créé le projet « ${name} » (${tasks.length} tâches)`, project.id);
-        await notify(memberIds, `${firstName(me!.id)} t’a ajouté(e) au projet « ${name} »`, `/projets/${project.id}`);
+        await notify(memberIds, `${firstName(me!.id)} t’a ajouté(e) au projet « ${name} »`, `/projets/${project.id}`, 'projet');
       },
       `Projet créé avec ${tasks.length} tâches`,
     );
@@ -215,7 +216,7 @@ function useStoreValue() {
           (s) => ({ ...s, projects: s.projects.map((x) => (x.id === p.id ? { ...x, ...patch } : x)) }),
           async () => {
             await backend.update('projects', existing.id, patch);
-            await notify(added, `${firstName(me!.id)} t’a ajouté(e) au projet « ${p.name} »`, `/projets/${existing.id}`);
+            await notify(added, `${firstName(me!.id)} t’a ajouté(e) au projet « ${p.name} »`, `/projets/${existing.id}`, 'projet');
           },
           'Projet mis à jour',
         );
@@ -230,7 +231,7 @@ function useStoreValue() {
         async () => {
           await backend.insert('projects', row);
           await log(`a créé le projet « ${row.name} »`, row.id);
-          await notify(row.member_ids, `${firstName(me!.id)} t’a ajouté(e) au projet « ${row.name} »`, `/projets/${row.id}`);
+          await notify(row.member_ids, `${firstName(me!.id)} t’a ajouté(e) au projet « ${row.name} »`, `/projets/${row.id}`, 'projet');
         },
         'Projet créé',
       ).then(() => row.id);
@@ -303,7 +304,7 @@ function useStoreValue() {
           async () => {
             await backend.update('tasks', existing.id, patch);
             if (patch.status === 'fait' && existing.status !== 'fait') await spawnNext({ ...existing, ...patch } as Task);
-            if (t.assignee_ids && added.length) await notify(added, `${firstName(me!.id)} t’a confié : « ${t.title} »${where}`, project ? `/projets/${project.id}` : '/ma-journee');
+            if (t.assignee_ids && added.length) await notify(added, `${firstName(me!.id)} t’a confié : « ${t.title} »${where}`, project ? `/projets/${project.id}` : '/ma-journee', 'tache');
           },
           'Tâche mise à jour',
         );
@@ -319,7 +320,7 @@ function useStoreValue() {
         async () => {
           await backend.insert('tasks', row);
           if (project) await log(`a ajouté la tâche « ${row.title} »`, project.id);
-          await notify(assigneesOf(row), `${firstName(me!.id)} t’a confié : « ${row.title} »${where}`, project ? `/projets/${project.id}?tache=${row.id}` : `/taches?tache=${row.id}`);
+          await notify(assigneesOf(row), `${firstName(me!.id)} t’a confié : « ${row.title} »${where}`, project ? `/projets/${project.id}?tache=${row.id}` : `/taches?tache=${row.id}`, 'tache');
         },
         quiet ? undefined : 'Tâche ajoutée',
       );
@@ -337,7 +338,7 @@ function useStoreValue() {
             // Tâche partagée : les autres personnes concernées et le créateur sont prévenus.
             const toWarn = [...assigneesOf(t), t.created_by ?? ''].filter((id) => id && id !== me!.id);
             if (toWarn.length)
-              await notify(toWarn, `✅ ${firstName(me!.id)} a terminé « ${t.title} »`, t.project_id ? `/projets/${t.project_id}?tache=${t.id}` : `/taches?tache=${t.id}`);
+              await notify(toWarn, `✅ ${firstName(me!.id)} a terminé « ${t.title} »`, t.project_id ? `/projets/${t.project_id}?tache=${t.id}` : `/taches?tache=${t.id}`, 'tache');
           }
         },
       );
@@ -382,9 +383,9 @@ function useStoreValue() {
         (s) => ({ ...s, task_comments: [...s.task_comments, row] }),
         async () => {
           await backend.insert('task_comments', row);
-          await notify(mentioned, `${firstName(me!.id)} t’a mentionné(e) sur « ${t.title} »`, link);
+          await notify(mentioned, `${firstName(me!.id)} t’a mentionné(e) sur « ${t.title} »`, link, 'mention');
           const others = [...assigneesOf(t), t.created_by ?? ''].filter((id) => id && !mentioned.includes(id));
-          await notify(others, `${firstName(me!.id)} a commenté « ${t.title} »`, link);
+          await notify(others, `${firstName(me!.id)} a commenté « ${t.title} »`, link, 'tache');
         },
       );
     },
@@ -428,7 +429,7 @@ function useStoreValue() {
         (s) => ({ ...s, comments: [...s.comments, row] }),
         async () => {
           await backend.insert('comments', row);
-          await notify(mentioned, `${firstName(me!.id)} t’a mentionné(e) dans « ${project.name} »`, `/projets/${project.id}`);
+          await notify(mentioned, `${firstName(me!.id)} t’a mentionné(e) dans « ${project.name} »`, `/projets/${project.id}`, 'mention');
         },
       );
     },
@@ -439,10 +440,21 @@ function useStoreValue() {
 
     saveEvent(e: Partial<CalEvent> & { title: string }) {
       const existing = e.id ? snap.events.find((x) => x.id === e.id) : undefined;
+      const when = (d: string, t: string) => `${d.split('-').reverse().slice(0, 2).join('/')} à ${t}`;
       if (existing) {
+        const next = { ...existing, ...e } as CalEvent;
+        const moved = next.date !== existing.date || next.time !== existing.time;
+        const invited = next.participant_ids.filter((id) => !existing.participant_ids.includes(id));
+        const stayed = next.participant_ids.filter((id) => existing.participant_ids.includes(id));
+        // Un rendez-vous déplacé doit à nouveau être rappelé.
+        const patch = moved ? { ...e, reminded_at: null } : e;
         return run(
-          (s) => ({ ...s, events: s.events.map((x) => (x.id === e.id ? { ...x, ...e } : x)) }),
-          () => backend.update('events', existing.id, e),
+          (s) => ({ ...s, events: s.events.map((x) => (x.id === e.id ? { ...x, ...patch } : x)) }),
+          async () => {
+            await backend.update('events', existing.id, patch);
+            if (moved) await notify(stayed, `📅 ${firstName(me!.id)} a déplacé « ${next.title} » : ${when(next.date, next.time)}`, '/agenda', 'rdv');
+            await notify(invited, `${firstName(me!.id)} t’invite : ${next.title} (${when(next.date, next.time)})`, '/agenda', 'rdv');
+          },
           'Événement mis à jour',
         );
       }
@@ -454,14 +466,23 @@ function useStoreValue() {
         (s) => ({ ...s, events: [row, ...s.events] }),
         async () => {
           await backend.insert('events', row);
-          await notify(row.participant_ids, `${firstName(me!.id)} t’invite : ${row.title} (${row.date.split('-').reverse().slice(0, 2).join('/')} à ${row.time})`, '/agenda');
+          await notify(row.participant_ids, `${firstName(me!.id)} t’invite : ${row.title} (${row.date.split('-').reverse().slice(0, 2).join('/')} à ${row.time})`, '/agenda', 'rdv');
         },
         'Événement enregistré',
       );
     },
 
     deleteEvent(e: CalEvent) {
-      return run((s) => ({ ...s, events: s.events.filter((x) => x.id !== e.id) }), () => backend.remove('events', e.id), 'Événement supprimé');
+      return run(
+        (s) => ({ ...s, events: s.events.filter((x) => x.id !== e.id) }),
+        async () => {
+          await backend.remove('events', e.id);
+          if (e.date >= now().slice(0, 10)) {
+            await notify(e.participant_ids, `❌ « ${e.title} » du ${e.date.split('-').reverse().slice(0, 2).join('/')} à ${e.time} est annulé`, '/agenda', 'rdv');
+          }
+        },
+        'Événement supprimé',
+      );
     },
 
     updateProfile(id: string, patch: Partial<Profile>, okText?: string) {
@@ -542,7 +563,7 @@ function useStoreValue() {
           await backend.insert('messages', msg);
           await backend.update('conversations', conv.id, { last_message_at: at });
           await backend.upsert('reads', mark);
-          await notify(mentioned, `💬 ${firstName(me!.id)} t’a mentionné(e) dans ${where}`, `/messages/${conv.id}`);
+          await notify(mentioned, `💬 ${firstName(me!.id)} t’a mentionné(e) dans ${where}`, `/messages/${conv.id}`, 'mention');
         },
       );
     },
@@ -581,7 +602,7 @@ function useStoreValue() {
         async () => {
           await backend.insert('announcements', row);
           await backend.upsert('announcement_reads', read);
-          await notify(snap.profiles.filter((p) => p.active).map((p) => p.id), `${row.important ? '📣 Important · ' : '📣 '}${row.title}`, '/annonces');
+          await notify(snap.profiles.filter((p) => p.active).map((p) => p.id), `${row.important ? '📣 Important · ' : '📣 '}${row.title}`, '/annonces', 'annonce');
         },
         'Annonce publiée',
       );
@@ -599,7 +620,7 @@ function useStoreValue() {
     remindAnnouncement(a: Announcement) {
       const readers = new Set(snap.announcement_reads.filter((r) => r.announcement_id === a.id).map((r) => r.user_id));
       const missing = snap.profiles.filter((p) => p.active && !readers.has(p.id)).map((p) => p.id);
-      return run((st) => st, () => notify(missing, `⏰ À lire : « ${a.title} »`, '/annonces'), `Relance envoyée à ${missing.length} personne${missing.length > 1 ? 's' : ''}`);
+      return run((st) => st, () => notify(missing, `⏰ À lire : « ${a.title} »`, '/annonces', 'annonce'), `Relance envoyée à ${missing.length} personne${missing.length > 1 ? 's' : ''}`);
     },
 
     // ---------- Documents ----------
@@ -742,9 +763,9 @@ function useStoreValue() {
           await backend.insert('absences', row);
           if (!admin) {
             const admins = snap.profiles.filter((p) => p.active && p.role === 'admin').map((p) => p.id);
-            await notify(admins, `🌴 ${who} demande une absence (${row.kind.toLowerCase()}) ${range}`, '/absences');
+            await notify(admins, `🌴 ${who} demande une absence (${row.kind.toLowerCase()}) ${range}`, '/absences', 'absence');
           } else if (row.user_id !== me!.id) {
-            await notify([row.user_id], `🌴 ${firstName(me!.id)} a noté ton absence (${row.kind.toLowerCase()}) ${range}`, '/absences');
+            await notify([row.user_id], `🌴 ${firstName(me!.id)} a noté ton absence (${row.kind.toLowerCase()}) ${range}`, '/absences', 'absence');
           }
         },
         admin ? 'Absence enregistrée' : 'Demande envoyée aux administrateurs',
@@ -756,7 +777,7 @@ function useStoreValue() {
         (st) => ({ ...st, absences: st.absences.map((x) => (x.id === a.id ? { ...x, status } : x)) }),
         async () => {
           await backend.update('absences', a.id, { status });
-          await notify([a.user_id], `🌴 Ta demande d’absence du ${a.start_date.split('-').reverse().slice(0, 2).join('/')} a été ${status === 'validee' ? 'validée ✅' : 'refusée'}`, '/absences');
+          await notify([a.user_id], `🌴 Ta demande d’absence du ${a.start_date.split('-').reverse().slice(0, 2).join('/')} a été ${status === 'validee' ? 'validée ✅' : 'refusée'}`, '/absences', 'absence');
         },
         status === 'validee' ? 'Absence validée' : 'Absence refusée',
       );
@@ -797,7 +818,7 @@ function useStoreValue() {
         (st) => ({ ...st, conversations: [conv, ...st.conversations] }),
         async () => {
           await backend.insert('conversations', conv);
-          await notify(conv.member_ids, `👥 ${firstName(me!.id)} t’a ajouté(e) au groupe « ${conv.title} »`, `/messages/${conv.id}`);
+          await notify(conv.member_ids, `👥 ${firstName(me!.id)} t’a ajouté(e) au groupe « ${conv.title} »`, `/messages/${conv.id}`, 'message');
         },
         'Groupe créé',
       );
@@ -824,7 +845,7 @@ function useStoreValue() {
         (st) => ({ ...st, conversations: st.conversations.map((c) => (c.id === conv.id ? { ...c, member_ids: [...c.member_ids, ...fresh] } : c)) }),
         async () => {
           await backend.update('conversations', conv.id, { member_ids: [...current.member_ids, ...fresh] });
-          await notify(fresh, `👥 ${firstName(me!.id)} t’a ajouté(e) au groupe « ${current.title ?? 'Conversation'} »`, `/messages/${conv.id}`);
+          await notify(fresh, `👥 ${firstName(me!.id)} t’a ajouté(e) au groupe « ${current.title ?? 'Conversation'} »`, `/messages/${conv.id}`, 'message');
         },
         fresh.length > 1 ? `${fresh.length} personnes ajoutées` : 'Personne ajoutée',
       );

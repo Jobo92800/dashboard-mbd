@@ -21,6 +21,7 @@ export interface Profile {
   availability_note: string;
   recap_email: boolean; // reçoit le récap du lundi (et le bilan du vendredi pour les admins)
   avatar_url: string | null; // photo de profil (sinon : initiales sur fond de couleur)
+  notif_prefs: Partial<Record<NotifKind, boolean>>; // absent = activé
 }
 
 export interface Project {
@@ -125,7 +126,22 @@ export interface CalEvent {
   participant_ids: string[];
   note: string;
   created_by: string | null;
+  reminded_at?: string | null; // rappel « dans 15 min » déjà envoyé
 }
+
+/** Catégorie d'une notification : sert aux préférences « ce qui sonne sur mon téléphone ». */
+export type NotifKind = 'tache' | 'message' | 'mention' | 'rdv' | 'annonce' | 'absence' | 'projet' | 'matin' | 'autre';
+
+/** Catégories réglables dans Mon profil (les @mentions passent toujours). */
+export const NOTIF_PREFS: { id: Exclude<NotifKind, 'mention' | 'autre'>; label: string; help: string }[] = [
+  { id: 'message', label: 'Messages', help: 'Nouveaux messages privés et de groupe' },
+  { id: 'tache', label: 'Tâches', help: 'Tâche confiée, commentée ou terminée' },
+  { id: 'rdv', label: 'Rendez-vous', help: 'Invitation, changement, et rappel 15 min avant' },
+  { id: 'annonce', label: 'Annonces', help: 'Annonces de la direction' },
+  { id: 'absence', label: 'Absences', help: 'Demandes et validations' },
+  { id: 'projet', label: 'Projets', help: 'Ajout à un projet' },
+  { id: 'matin', label: 'Récap du matin', help: 'À 8 h : tes rendez-vous et tâches du jour' },
+];
 
 export interface Notification {
   id: string;
@@ -134,6 +150,7 @@ export interface Notification {
   link: string | null;
   read: boolean;
   created_at: string;
+  kind?: NotifKind;
 }
 
 export interface Activity {

@@ -65,7 +65,11 @@ export default async (req: Request) => {
       // Marquage atomique : une notification n'est envoyée qu'une fois.
       const { data: n } = await sb.from('notifications').update({ pushed_at: new Date().toISOString() }).eq('id', id).is('pushed_at', null).select('*').maybeSingle();
       if (!n) return json(200, { ok: true, skipped: true });
-      await sendTo([n.user_id], { title: 'MA HQ', body: n.text, url: n.link || '/', tag: `notif-${n.id}` });
+      // Préférences de la personne : une catégorie coupée ne sonne pas (les @mentions passent toujours).
+      const { data: prof } = await sb.from('profiles').select('notif_prefs').eq('id', n.user_id).maybeSingle();
+      const kind = (n.kind as string) || 'autre';
+      if (!['mention', 'autre'].includes(kind) && prof?.notif_prefs?.[kind] === false) return json(200, { ok: true, muted: true });
+      await sendTo([n.user_id], { title: 'MA HQ', body: n.text, url: n.link || '/', tag: kind === 'rdv' || kind === 'matin' ? `${kind}-${n.id}` : `notif-${n.id}` });
       return json(200, { ok: true });
     }
 
@@ -74,13 +78,15 @@ export default async (req: Request) => {
       if (!m) return json(200, { ok: true, skipped: true });
       const { data: conv } = await sb.from('conversations').select('*').eq('id', m.conversation_id).maybeSingle();
       if (!conv) return json(200, { ok: true });
-      const { data: people } = await sb.from('profiles').select('id, full_name, active').in('id', conv.member_ids);
+      const { data: people } = await sb.from('profiles').select('id, full_name, active, notif_prefs').in('id', conv.member_ids);
       const author = people?.find((p) => p.id === m.author_id);
       // Sourdine respectée ; les personnes @mentionnées reçoivent déjà la notification de mention.
       const { data: muted } = await sb.from('reads').select('user_id').eq('conversation_id', conv.id).eq('muted', true);
       const mutedIds = new Set((muted ?? []).map((r) => r.user_id));
       const mentioned = new Set((people ?? []).filter((p) => new RegExp(`@${firstName(p.full_name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(m.body)).map((p) => p.id));
-      const to = (people ?? []).filter((p) => p.active && p.id !== m.author_id && !mutedIds.has(p.id) && !mentioned.has(p.id)).map((p) => p.id);
+      const to = (people ?? [])
+        .filter((p) => p.active && p.id !== m.author_id && !mutedIds.has(p.id) && !mentioned.has(p.id) && p.notif_prefs?.message !== false)
+        .map((p) => p.id);
       const group = !!conv.title || conv.member_ids.length > 2;
       const text = m.body?.trim() || '📎 Pièce jointe';
       await sendTo(to, {

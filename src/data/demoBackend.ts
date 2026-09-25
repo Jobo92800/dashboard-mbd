@@ -33,7 +33,7 @@ function normalize(raw: Partial<Snapshot>): Snapshot {
   }));
   s.reads = s.reads.map((r) => ({ ...r, muted: r.muted ?? false, pinned: r.pinned ?? false }));
   s.tasks = s.tasks.map((t) => ({ ...t, checklist: t.checklist ?? [], attachments: t.attachments ?? [], recurrence: t.recurrence ?? null, assignee_ids: t.assignee_ids?.length ? t.assignee_ids : t.assignee_id ? [t.assignee_id] : [] }));
-  s.profiles = s.profiles.map((p) => ({ ...p, recap_email: p.recap_email ?? true, avatar_url: p.avatar_url ?? null }));
+  s.profiles = s.profiles.map((p) => ({ ...p, recap_email: p.recap_email ?? true, avatar_url: p.avatar_url ?? null, notif_prefs: p.notif_prefs ?? {} }));
   return s;
 }
 
@@ -168,7 +168,7 @@ export const demoBackend: Backend = {
     }
     s.profiles.push({
       id: uid(), ...m, email: m.email.trim().toLowerCase(), active: true,
-      availability: 'disponible', availability_note: '', recap_email: true, avatar_url: null,
+      availability: 'disponible', availability_note: '', recap_email: true, avatar_url: null, notif_prefs: {},
     });
     write(s);
     return { tempPassword: DEMO_PASSWORD };
