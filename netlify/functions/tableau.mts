@@ -2,7 +2,8 @@
 //  ① Téléphone (commerciales) — base « CRM 2026 » : prospects → joints → bilans placés.
 //  ② Centre (thérapeutes) — base « CRM News », table Clients : une fiche par bilan
 //     réalisé en centre ; une cure est vendue quand « Montant Cure » est renseigné.
-// Réservé aux administrateurs. GET ?mois=AAAA-MM
+// Réservé aux administrateurs. GET ?du=AAAA-MM-JJ&au=AAAA-MM-JJ (ou ?mois=AAAA-MM).
+// La comparaison porte sur la période précédente de même durée.
 import { callerProfile, json } from '../lib/server.mts';
 
 const CRM = process.env.AIRTABLE_BASE_ID || 'appNML7rJEKiWkuVg';
@@ -26,20 +27,19 @@ function centreOf(v: unknown) {
   return 'Non renseigné';
 }
 
-/** Mois « AAAA-MM » d'une date Airtable, à l'heure de Paris. */
-function monthOf(v: unknown) {
+/** Jour « AAAA-MM-JJ » d'une date Airtable, à l'heure de Paris. */
+function dayOf(v: unknown) {
   if (!v || typeof v !== 'string') return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v.slice(0, 7);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return null;
-  return new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).format(d).slice(0, 7);
+  return new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(d);
 }
-const dayOf = (v: unknown) => new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date(String(v)));
 
-const prevMonth = (m: string) => {
-  const [y, mo] = m.split('-').map(Number);
-  return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, '0')}`;
-};
+const DAY = 86_400_000;
+const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * DAY).toISOString().slice(0, 10);
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / DAY);
+const isDay = (v: string | null) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
 
 /** « Malvina, Alex » → ['Malvina', 'Alex'] ; « MARIE SAN », « marie-san » → « Marie-San » ; « Alexandra 2 » → « Alexandra ». */
 function people(v: unknown) {
@@ -70,10 +70,13 @@ async function fetchAll(base: string, table: string, fields: string[], formula: 
   return out;
 }
 
-/** Le IF est indispensable : sur une date vide, DATETIME_FORMAT renvoie une erreur
+/** Fiches dont le champ date tombe entre deux jours inclus (heure de Paris).
+ *  Le IF est indispensable : sur une date vide, DATETIME_FORMAT renvoie une erreur
  *  qui fait écarter la fiche entière, même quand l'autre moitié du OR est vraie. */
-const inMonths = (field: string, months: string[]) =>
-  `OR(${months.map((m) => `IF({${field}},DATETIME_FORMAT(SET_TIMEZONE({${field}},'Europe/Paris'),'YYYY-MM'),'')='${m}'`).join(',')})`;
+const between = (field: string, from: string, to: string) => {
+  const v = `IF({${field}},VALUE(DATETIME_FORMAT(SET_TIMEZONE({${field}},'Europe/Paris'),'YYYYMMDD')),0)`;
+  return `AND(${v}>=${from.replaceAll('-', '')},${v}<=${to.replaceAll('-', '')})`;
+};
 
 /** Par centre et par mois. */
 type Stat = { leads: number; joints: number; bilans: number; realises: number; cures: number; ca: number; caBilans: number };
@@ -91,14 +94,24 @@ export default async (req: Request) => {
   if (!process.env.AIRTABLE_TOKEN) return json(503, { error: 'non_configure' });
 
   const url = new URL(req.url);
-  const month = /^\d{4}-\d{2}$/.test(url.searchParams.get('mois') ?? '') ? url.searchParams.get('mois')! : new Date().toISOString().slice(0, 7);
-  const fresh = url.searchParams.get('rafraichir') === '1';
-  const hit = cache.get(month);
+  const q = url.searchParams;
+  let from = q.get('du'), to = q.get('au');
+  const mois = q.get('mois');
+  if (!isDay(from) || !isDay(to)) {
+    const m = mois && /^\d{4}-\d{2}$/.test(mois) ? mois : new Date().toISOString().slice(0, 7);
+    from = `${m}-01`;
+    to = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).toISOString().slice(0, 10); // dernier jour du mois
+  }
+  if (from! > to!) [from, to] = [to, from];
+  if (daysBetween(from!, to!) > 366) return json(400, { error: 'Choisis une période d’un an maximum.' });
+  const key = `${from}|${to}`;
+  const fresh = q.get('rafraichir') === '1';
+  const hit = cache.get(key);
   if (hit && !fresh && Date.now() - hit.at < 5 * 60_000) return json(200, hit.data);
 
   try {
-    const data = await compute(month);
-    cache.set(month, { at: Date.now(), data });
+    const data = await compute(from!, to!);
+    cache.set(key, { at: Date.now(), data });
     return json(200, data);
   } catch (e) {
     console.error(e);
@@ -106,18 +119,24 @@ export default async (req: Request) => {
   }
 };
 
-export async function compute(month: string) {
-  const months = [month, prevMonth(month)];
+export async function compute(from: string, to: string) {
+  const len = daysBetween(from, to) + 1;
+  let prevFrom = addDays(from, -len);
+  const prevTo = addDays(from, -1);
+  // Un mois entier se compare au mois précédent entier, pas aux N jours d'avant.
+  if (from.endsWith('-01') && addDays(to, 1).endsWith('-01') && from.slice(0, 7) === to.slice(0, 7)) prevFrom = `${prevTo.slice(0, 7)}-01`;
+  /** 'cur' pour la période choisie, 'prev' pour la période d'avant, null sinon. */
+  const period = (d: string | null) => (!d ? null : d >= from && d <= to ? 'cur' : d >= prevFrom && d <= prevTo ? 'prev' : null);
   {
     const phoneFields = ['Centre', 'Création', 'Source', 'Commercial', 'Statut', 'Date Bilan Placé', 'Répondu Appel 1', 'Répondu Appel 2', 'Répondu Appel 3'];
     const [master, perdus, clients] = await Promise.all([
-      fetchAll(CRM, MASTER, phoneFields, `OR(${inMonths('Création', months)},${inMonths('Date Bilan Placé', months)})`),
-      fetchAll(CRM, PERDU, phoneFields, `OR(${inMonths('Création', months)},${inMonths('Date Bilan Placé', months)})`),
+      fetchAll(CRM, MASTER, phoneFields, `OR(${between('Création', prevFrom, to)},${between('Date Bilan Placé', prevFrom, to)})`),
+      fetchAll(CRM, PERDU, phoneFields, between('Date Bilan Placé', prevFrom, to)),
       fetchAll(NEWS, CLIENTS, ['Centre', 'Thérapeute', 'Date bilan', 'date de création', 'Bilan seul', ...CURES],
-        `OR(${inMonths('Date bilan', months)},AND(NOT({Date bilan}),${inMonths('date de création', months)}))`),
+        `OR(${between('Date bilan', prevFrom, to)},AND(NOT({Date bilan}),${between('date de création', prevFrom, to)}))`),
     ]);
 
-    const byMonth: Record<string, Record<string, Stat>> = {};
+    const byMonth: Record<string, Record<string, Stat>> = {}; // 'cur' | 'prev'
     const bucket = (m: string, c: string) => ((byMonth[m] ??= {})[c] ??= empty());
     const sources: Record<string, { leads: number; bilans: number }> = {};
     const commerciales: Record<string, Commerciale> = {};
@@ -135,21 +154,22 @@ export async function compute(month: string) {
       const who = String(f['Commercial'] ?? '').trim() || 'Non attribué';
       const src = String(f['Source'] ?? '').trim() || 'Non renseignée';
       const joint = Boolean(f['Répondu Appel 1'] || f['Répondu Appel 2'] || f['Répondu Appel 3']);
-      const created = monthOf(f['Création']);
-      if (created && months.includes(created) && fromMaster.has(r)) {
+      const createdDay = dayOf(f['Création']);
+      const created = period(createdDay);
+      if (created && fromMaster.has(r)) {
         const s = bucket(created, c);
         s.leads++;
         if (joint) s.joints++;
-        if (created === month) {
+        if (created === 'cur') {
           (sources[src] ??= { leads: 0, bilans: 0 }).leads++;
-          leadsParJour[dayOf(f['Création'])] = (leadsParJour[dayOf(f['Création'])] ?? 0) + 1;
+          leadsParJour[createdDay!] = (leadsParJour[createdDay!] ?? 0) + 1;
           if (who !== 'Non attribué') { com(who).leads++; if (joint) com(who).joints++; }
         }
       }
-      const placed = monthOf(f['Date Bilan Placé']);
-      if (placed && months.includes(placed)) {
+      const placed = period(dayOf(f['Date Bilan Placé']));
+      if (placed) {
         bucket(placed, c).bilans++;
-        if (placed === month) {
+        if (placed === 'cur') {
           (sources[src] ??= { leads: 0, bilans: 0 }).bilans++;
           const k = com(who);
           k.bilans++;
@@ -165,15 +185,15 @@ export async function compute(month: string) {
     // ② Centre
     for (const r of clients) {
       const f = r.fields;
-      const m = monthOf(f['Date bilan']) ?? monthOf(f['date de création']);
-      if (!m || !months.includes(m)) continue;
+      const m = period(dayOf(f['Date bilan']) ?? dayOf(f['date de création']));
+      if (!m) continue;
       const s = bucket(m, centreOf(f['Centre']));
       const cure = CURES.reduce((t, k) => t + (Number(f[k]) || 0), 0);
       const bilanSeul = Number(f['Bilan seul']) || 0;
       s.realises++;
       s.caBilans += bilanSeul;
       if (cure > 0) { s.cures++; s.ca += cure; }
-      if (m === month) {
+      if (m === 'cur') {
         const names = people(f['Thérapeute']);
         for (const n of names.length ? names : ['Non renseignée']) {
           const t = (therapeutes[n] ??= { bilans: 0, cures: 0, ca: 0 });
@@ -184,11 +204,10 @@ export async function compute(month: string) {
     }
 
     return {
-      month,
-      previous: months[1],
+      from, to, prevFrom, prevTo,
       centres: CENTRES,
-      current: byMonth[month] ?? {},
-      prev: byMonth[months[1]] ?? {},
+      current: byMonth.cur ?? {},
+      prev: byMonth.prev ?? {},
       sources,
       commerciales,
       therapeutes,

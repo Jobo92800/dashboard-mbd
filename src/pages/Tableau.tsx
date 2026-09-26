@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { format, getDaysInMonth, parseISO } from 'date-fns';
+import { addDays, addMonths, differenceInCalendarDays, endOfMonth, endOfWeek, format, isSameMonth, isSameYear, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, RefreshCw, Target } from 'lucide-react';
 import { useStore } from '../state/store';
@@ -13,7 +13,7 @@ type Stat = { leads: number; joints: number; bilans: number; realises: number; c
 type Commerciale = { leads: number; joints: number; bilans: number; venus: number; annules: number; manques: number; cures: number };
 type Therapeute = { bilans: number; cures: number; ca: number };
 type Data = {
-  month: string; previous: string; centres: string[];
+  from: string; to: string; prevFrom: string; prevTo: string; centres: string[];
   current: Record<string, Stat>; prev: Record<string, Stat>;
   sources: Record<string, { leads: number; bilans: number }>;
   commerciales: Record<string, Commerciale>;
@@ -39,10 +39,50 @@ const fmt = (k: keyof Stat, n: number) => (isMoney(k) ? euro(n) : new Intl.Numbe
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 const sum = (rec: Record<string, Stat>, k: keyof Stat) => Object.values(rec).reduce((s, x) => s + (x[k] ?? 0), 0);
 const plural = (n: number, w: string) => `${n} ${w}${n > 1 ? 's' : ''}`;
-const shift = (m: string, d: number) => { const [y, mo] = m.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1 + d, 1)); return t.toISOString().slice(0, 7); };
+const iso = (d: Date) => format(d, 'yyyy-MM-dd');
+
+type Preset = 'jour' | 'semaine' | 'mois' | 'perso';
+type Period = { preset: Preset; from: string; to: string };
+const PRESETS: { id: Preset; label: string }[] = [
+  { id: 'jour', label: 'Jour' }, { id: 'semaine', label: 'Semaine' }, { id: 'mois', label: 'Mois' }, { id: 'perso', label: 'Période' },
+];
+/** La période du type choisi qui contient `day`. */
+function periodAt(preset: Preset, day: Date): Period {
+  if (preset === 'jour') return { preset, from: iso(day), to: iso(day) };
+  if (preset === 'semaine') return { preset, from: iso(startOfWeek(day, { weekStartsOn: 1 })), to: iso(endOfWeek(day, { weekStartsOn: 1 })) };
+  return { preset: 'mois', from: iso(startOfMonth(day)), to: iso(endOfMonth(day)) };
+}
+/** Période suivante (+1) ou précédente (-1), de même type et même durée. */
+function step(p: Period, dir: 1 | -1): Period {
+  const from = parseISO(p.from);
+  if (p.preset === 'mois') return periodAt('mois', addMonths(from, dir));
+  const len = differenceInCalendarDays(parseISO(p.to), from) + 1;
+  return { ...p, from: iso(addDays(from, dir * len)), to: iso(addDays(parseISO(p.to), dir * len)) };
+}
+function periodLabel(p: Period) {
+  const a = parseISO(p.from), b = parseISO(p.to);
+  if (p.from === p.to) return format(a, isSameYear(a, new Date()) ? 'EEEE d MMMM' : 'EEEE d MMMM yyyy', { locale: fr });
+  if (p.preset === 'mois') return format(a, 'MMMM yyyy', { locale: fr });
+  if (isSameMonth(a, b)) return `${format(a, 'd')} – ${format(b, 'd MMMM yyyy', { locale: fr })}`;
+  if (isSameYear(a, b)) return `${format(a, 'd MMM', { locale: fr })} – ${format(b, 'd MMM yyyy', { locale: fr })}`;
+  return `${format(a, 'd MMM yyyy', { locale: fr })} – ${format(b, 'd MMM yyyy', { locale: fr })}`;
+}
+function compareLabel(p: Period, prevFrom: string) {
+  if (p.from === p.to) return p.from === iso(new Date()) ? 'vs hier' : 'vs la veille';
+  if (p.preset === 'semaine') return 'vs semaine d’avant';
+  if (p.preset === 'mois') return `vs ${format(parseISO(prevFrom), 'MMMM', { locale: fr })}`;
+  return 'vs période d’avant';
+}
+const PERIOD_KEY = 'mahq_tableau_periode';
+function initialPeriod(): Period {
+  try { const preset = localStorage.getItem(PERIOD_KEY) as Preset | null; if (preset && preset !== 'perso') return periodAt(preset, new Date()); } catch { /* stockage indisponible */ }
+  return periodAt('mois', new Date());
+}
 
 /** Données d'exemple pour la démo (proches des volumes réels de septembre 2026). */
-function demoData(month: string): Data {
+function demoData(from: string, to: string): Data {
+  const len = differenceInCalendarDays(parseISO(to), parseISO(from)) + 1;
+  const k = Math.min(1, len / 30);
   const base: Record<string, Stat> = {
     'Le Grau-du-Roi': { leads: 111, joints: 70, bilans: 18, realises: 16, cures: 11, ca: 14800, caBilans: 390 },
     'Le Crès': { leads: 72, joints: 45, bilans: 17, realises: 14, cures: 8, ca: 11600, caBilans: 520 },
@@ -50,9 +90,10 @@ function demoData(month: string): Data {
     'Cabestany': { leads: 129, joints: 80, bilans: 23, realises: 15, cures: 7, ca: 9800, caBilans: 770 },
     'Avignon': { leads: 125, joints: 83, bilans: 31, realises: 24, cures: 14, ca: 21400, caBilans: 390 },
   };
+  for (const s of Object.values(base)) for (const key of Object.keys(s) as (keyof Stat)[]) s[key] = Math.round(s[key] * k);
   const prev = Object.fromEntries(Object.entries(base).map(([c, s]) => [c, Object.fromEntries(Object.entries(s).map(([k, v]) => [k, Math.round(v * 0.85)])) as Stat]));
   return {
-    month, previous: shift(month, -1), centres: CENTRES, current: base, prev,
+    from, to, prevFrom: iso(addDays(parseISO(from), -len)), prevTo: iso(addDays(parseISO(from), -1)), centres: CENTRES, current: base, prev,
     sources: { 'Facebook Ads': { leads: 402, bilans: 71 }, 'LP-Google': { leads: 88, bilans: 19 }, 'Bioportrait': { leads: 54, bilans: 14 }, 'Site Web': { leads: 29, bilans: 6 }, 'Instagram Ads': { leads: 16, bilans: 4 } },
     commerciales: {
       Marie: { leads: 210, joints: 140, bilans: 41, venus: 22, annules: 3, manques: 2, cures: 13 },
@@ -63,14 +104,16 @@ function demoData(month: string): Data {
       Laura: { bilans: 12, cures: 8, ca: 11200 }, Caroll: { bilans: 11, cures: 7, ca: 7900 }, Marie: { bilans: 10, cures: 6, ca: 8100 },
       Malvina: { bilans: 8, cures: 5, ca: 6100 }, Alex: { bilans: 7, cures: 4, ca: 6400 }, Sara: { bilans: 8, cures: 3, ca: 3600 }, Marine: { bilans: 7, cures: 4, ca: 5200 },
     },
-    leadsParJour: Object.fromEntries(Array.from({ length: 25 }, (_, i) => [`${month}-${String(i + 1).padStart(2, '0')}`, 12 + ((i * 7) % 19)])),
+    leadsParJour: Object.fromEntries(Array.from({ length: len }, (_, i) => [iso(addDays(parseISO(from), i)), 12 + ((i * 7) % 19)])),
     updatedAt: new Date().toISOString(),
   };
 }
 
 export default function Tableau() {
   const { me, mode, snap } = useStore();
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [period, setPeriodState] = useState<Period>(initialPeriod);
+  const setPeriod = (p: Period) => { setPeriodState(p); try { localStorage.setItem(PERIOD_KEY, p.preset); } catch { /* ignoré */ } };
+  const month = period.from.slice(0, 7);
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,26 +122,28 @@ export default function Tableau() {
   const load = useCallback(async (fresh = false) => {
     setLoading(true); setError('');
     try {
-      if (mode === 'demo') { setData(demoData(month)); return; }
+      if (mode === 'demo') { setData(demoData(period.from, period.to)); return; }
       const token = await backend.accessToken();
-      const res = await fetch(`/.netlify/functions/tableau?mois=${month}${fresh ? '&rafraichir=1' : ''}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/.netlify/functions/tableau?du=${period.from}&au=${period.to}${fresh ? '&rafraichir=1' : ''}`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Tableau indisponible.');
       setData(body as Data);
     } catch (e) { setError((e as Error).message); setData(null); }
     finally { setLoading(false); }
-  }, [month, mode]);
+  }, [period.from, period.to, mode]);
   useEffect(() => { load(); }, [load]);
 
   const objectives = useMemo(() => new Map(snap.objectives.filter((o) => o.month === month).map((o) => [o.centre, o])), [snap.objectives, month]);
   if (!isAdmin(me)) return <Navigate to="/" replace />;
 
   const today = new Date().toISOString().slice(0, 10);
-  const isCurrent = month === today.slice(0, 7);
-  const daysIn = getDaysInMonth(parseISO(`${month}-01`));
-  const elapsed = isCurrent ? Number(today.slice(8, 10)) : daysIn;
-  const project = (n: number) => (isCurrent && elapsed > 0 ? Math.round((n / elapsed) * daysIn) : n);
-  const objTotal = (k?: keyof Objective) => { if (!k) return null; const vals = CENTRES.map((c) => objectives.get(c)?.[k] as number | null | undefined).filter((v): v is number => typeof v === 'number'); return vals.length ? vals.reduce((a, b) => a + b, 0) : null; };
+  const isCurrent = today >= period.from && today <= period.to;
+  const len = differenceInCalendarDays(parseISO(period.to), parseISO(period.from)) + 1;
+  const elapsed = isCurrent ? differenceInCalendarDays(parseISO(today), parseISO(period.from)) + 1 : len;
+  const project = (n: number) => (isCurrent && elapsed > 0 ? Math.round((n / elapsed) * len) : n);
+  /** Les objectifs sont mensuels : on ne les montre que sur un mois entier. */
+  const showObj = period.preset === 'mois';
+  const objTotal = (k?: keyof Objective) => { if (!k || !showObj) return null; const vals = CENTRES.map((c) => objectives.get(c)?.[k] as number | null | undefined).filter((v): v is number => typeof v === 'number'); return vals.length ? vals.reduce((a, b) => a + b, 0) : null; };
   const t = (k: keyof Stat) => (data ? sum(data.current, k) : 0);
 
   return (
@@ -107,13 +152,7 @@ export default function Tableau() {
         <Button onClick={() => setEditObj(true)}><Target size={16} /> Objectifs du mois</Button>
       </PageTitle>
 
-      <div className="mb-5 flex flex-wrap items-center gap-2">
-        <IconButton label="Mois précédent" onClick={() => setMonth(shift(month, -1))}><ChevronLeft size={18} /></IconButton>
-        <h2 className="min-w-[150px] text-center text-lg font-semibold capitalize">{format(parseISO(`${month}-01`), 'MMMM yyyy', { locale: fr })}</h2>
-        <IconButton label="Mois suivant" disabled={isCurrent} onClick={() => setMonth(shift(month, 1))}><ChevronRight size={18} /></IconButton>
-        {isCurrent && <span className="text-xs text-mab-texte">Jour {elapsed} / {daysIn} · projection fin de mois au rythme actuel</span>}
-        <Button variant="discret" className="ml-auto" disabled={loading} onClick={() => load(true)}><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Actualiser</Button>
-      </div>
+      <PeriodPicker period={period} onChange={setPeriod} loading={loading} onRefresh={() => load(true)} isCurrent={isCurrent} elapsed={elapsed} len={len} />
       {mode === 'demo' && <p className="mb-4 rounded-mab-champ bg-mab-violet-wash px-4 py-2 text-sm text-mab-violet-texte">Démo : chiffres d’exemple. En ligne, ils viennent de ton Airtable.</p>}
 
       {error === 'non_configure' ? (
@@ -140,7 +179,7 @@ export default function Tableau() {
                   <p className="mt-1 text-[28px] font-light tabular-nums leading-tight text-mab-encre sm:text-[32px]">{fmt(k.id, v)}</p>
                   {delta !== null && (
                     <p className={`text-xs font-medium ${delta >= 0 ? 'text-mab-succes' : 'text-mab-erreur'}`}>
-                      {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)} % <span className="font-normal text-mab-texte">vs {format(parseISO(`${data.previous}-01`), 'MMMM', { locale: fr })}</span>
+                      {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)} % <span className="font-normal text-mab-texte">{compareLabel(period, data.prevFrom)}</span>
                     </p>
                   )}
                   {obj !== null && <ObjBar value={v} goal={obj} projected={project(v)} fmtv={(n) => fmt(k.id, n)} />}
@@ -165,7 +204,7 @@ export default function Tableau() {
                   name, value: s.bilans,
                   extra: [s.leads ? `${plural(s.joints, 'joint')} sur ${s.leads} prospects` : null, `${s.venus} venu${s.venus > 1 ? 's' : ''}`, s.annules ? `${s.annules} annulé${s.annules > 1 ? 's' : ''}` : null, s.manques ? `${s.manques} absent${s.manques > 1 ? 's' : ''}` : null].filter(Boolean).join(' · '),
                 }))} />
-                <p className="mt-3 text-xs text-mab-gris-doux">« Venus » : bilans placés ce mois-ci dont la cliente est déjà passée en centre. Les autres ont leur rendez-vous plus tard.</p>
+                <p className="mt-3 text-xs text-mab-gris-doux">« Venus » : bilans placés sur la période dont la cliente est déjà passée en centre. Les autres ont leur rendez-vous plus tard.</p>
               </Card>
               <Card className="p-5">
                 <h3 className="mb-3 text-lg font-semibold">D’où viennent les prospects</h3>
@@ -195,16 +234,16 @@ export default function Tableau() {
           {/* Par centre */}
           <section className="mb-8">
             <h2 className="mb-3 text-xl font-light">Par <b className="font-semibold">centre</b></h2>
-            <CentreTable data={data} objectives={objectives} project={project} isCurrent={isCurrent} />
+            <CentreTable data={data} objectives={showObj ? objectives : new Map()} project={project} isCurrent={isCurrent} />
           </section>
 
-          <Card className="p-5">
+          {len > 1 && <Card className="p-5">
             <Surtitre>Rythme</Surtitre>
             <h2 className="mb-3 mt-1 text-lg font-semibold">Nouveaux prospects par jour</h2>
-            <DailyBars month={month} values={data.leadsParJour} />
-          </Card>
+            <DailyBars from={period.from} to={period.to} values={data.leadsParJour} />
+          </Card>}
 
-          <p className="mt-4 text-xs text-mab-gris-doux">Données Airtable lues le {format(new Date(data.updatedAt), "d MMMM 'à' HH:mm", { locale: fr })} (mises en cache 5 min). Téléphone : prospects arrivés ce mois-ci dans CRM 2026 (hors fiches déjà passées en « Perdu / Injoignable », qui perdent leur date d’arrivée) ; un bilan compte le jour où il est placé, même pour un prospect arrivé avant. Centre : fiches clientes CRM News dont le bilan a eu lieu ce mois-ci ; une cure est vendue quand un montant de cure est renseigné.</p>
+          <p className="mt-4 text-xs text-mab-gris-doux">Données Airtable lues le {format(new Date(data.updatedAt), "d MMMM 'à' HH:mm", { locale: fr })} (mises en cache 5 min). Téléphone : prospects arrivés sur la période dans CRM 2026 (hors fiches déjà passées en « Perdu / Injoignable », qui perdent leur date d’arrivée) ; un bilan compte le jour où il est placé, même pour un prospect arrivé avant. Centre : fiches clientes CRM News dont le bilan a eu lieu sur la période ; une cure est vendue quand un montant de cure est renseigné.</p>
         </>
       )}
 
@@ -339,21 +378,76 @@ function HBars({ rows, limit = 8 }: { rows: { name: string; value: number; extra
   );
 }
 
-function DailyBars({ month, values }: { month: string; values: Record<string, number> }) {
-  const days = getDaysInMonth(parseISO(`${month}-01`));
-  const list = Array.from({ length: days }, (_, i) => { const d = `${month}-${String(i + 1).padStart(2, '0')}`; return { d, v: values[d] ?? 0 }; });
+/** Prospects par jour ; au-delà de deux mois, regroupés par semaine. */
+function DailyBars({ from, to, values }: { from: string; to: string; values: Record<string, number> }) {
+  const days = differenceInCalendarDays(parseISO(to), parseISO(from)) + 1;
+  const byWeek = days > 62;
+  const list: { d: string; v: number; label: string }[] = [];
+  for (let i = 0; i < days; i++) {
+    const day = addDays(parseISO(from), i);
+    const v = values[iso(day)] ?? 0;
+    if (!byWeek) { list.push({ d: iso(day), v, label: `${format(day, 'EEE d MMM', { locale: fr })} : ${v} prospect${v > 1 ? 's' : ''}` }); continue; }
+    const wk = iso(startOfWeek(day, { weekStartsOn: 1 }));
+    const last = list[list.length - 1];
+    if (last?.d === wk) { last.v += v; last.label = `Semaine du ${format(parseISO(wk), 'd MMM', { locale: fr })} : ${last.v} prospects`; }
+    else list.push({ d: wk, v, label: `Semaine du ${format(parseISO(wk), 'd MMM', { locale: fr })} : ${v} prospects` });
+  }
   const max = Math.max(1, ...list.map((x) => x.v));
   const total = list.reduce((s, x) => s + x.v, 0);
+  const tick = (d: string) => format(parseISO(d), days > 31 ? 'd MMM' : 'd', { locale: fr });
   return (
     <div>
-      <div className="flex h-32 items-end gap-[2px]" role="img" aria-label={`Prospects par jour, total ${total}`}>
+      <div className="flex h-32 items-end gap-[2px]" role="img" aria-label={`Prospects ${byWeek ? 'par semaine' : 'par jour'}, total ${total}`}>
         {list.map((x) => (
-          <div key={x.d} className="group relative flex h-full flex-1 items-end" title={`${format(parseISO(x.d), 'd MMM', { locale: fr })} : ${x.v} prospect${x.v > 1 ? 's' : ''}`}>
+          <div key={x.d} className="group relative flex h-full flex-1 items-end" title={x.label}>
             <div className="w-full rounded-t-[4px] bg-mab-aqua transition group-hover:bg-mab-aqua-texte" style={{ height: `${(x.v / max) * 100}%`, minHeight: x.v ? 2 : 0 }} />
           </div>
         ))}
       </div>
-      <div className="mt-1 flex justify-between text-[10px] text-mab-gris-doux"><span>1</span><span>{Math.ceil(days / 2)}</span><span>{days}</span></div>
+      <div className="mt-1 flex justify-between text-[10px] text-mab-gris-doux"><span>{tick(list[0].d)}</span>{list.length > 2 && <span>{tick(list[Math.floor(list.length / 2)].d)}</span>}<span>{tick(list[list.length - 1].d)}</span></div>
+      {byWeek && <p className="mt-1 text-[11px] text-mab-gris-doux">Regroupé par semaine.</p>}
+    </div>
+  );
+}
+
+function PeriodPicker({ period, onChange, loading, onRefresh, isCurrent, elapsed, len }: { period: Period; onChange: (p: Period) => void; loading: boolean; onRefresh: () => void; isCurrent: boolean; elapsed: number; len: number }) {
+  const today = iso(new Date());
+  const atEnd = period.to >= today;
+  const pick = (preset: Preset) => {
+    if (preset === 'perso') onChange({ preset, from: period.from, to: period.to });
+    else onChange(periodAt(preset, period.to > today ? new Date() : parseISO(period.to)));
+  };
+  const setDate = (which: 'from' | 'to', v: string) => {
+    if (!v) return;
+    const next = { ...period, preset: 'perso' as const, [which]: v };
+    if (next.from > next.to) { if (which === 'from') next.to = v; else next.from = v; }
+    onChange(next);
+  };
+  return (
+    <div className="mb-5 grid gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex rounded-mab-pilule border border-mab-filet bg-white p-1" role="tablist" aria-label="Type de période">
+          {PRESETS.map((p) => (
+            <button key={p.id} role="tab" aria-selected={period.preset === p.id} onClick={() => pick(p.id)}
+              className={`rounded-mab-pilule px-3.5 py-1.5 text-sm font-medium transition ${period.preset === p.id ? 'bg-mab-encre text-white' : 'text-mab-texte hover:text-mab-encre'}`}>{p.label}</button>
+          ))}
+        </div>
+        <Button variant="discret" className="ml-auto" disabled={loading} onClick={onRefresh}><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Actualiser</Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <IconButton label="Période précédente" onClick={() => onChange(step(period, -1))}><ChevronLeft size={18} /></IconButton>
+        {period.preset === 'perso' ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <label className="flex items-center gap-1.5"><span className="text-mab-texte">Du</span><Input type="date" value={period.from} max={today} onChange={(e) => setDate('from', e.target.value)} className="!h-10 !w-auto" /></label>
+            <label className="flex items-center gap-1.5"><span className="text-mab-texte">au</span><Input type="date" value={period.to} max={today} onChange={(e) => setDate('to', e.target.value)} className="!h-10 !w-auto" /></label>
+          </div>
+        ) : (
+          <h2 className="min-w-[150px] text-center text-lg font-semibold first-letter:uppercase">{periodLabel(period)}</h2>
+        )}
+        <IconButton label="Période suivante" disabled={atEnd} onClick={() => onChange(step(period, 1))}><ChevronRight size={18} /></IconButton>
+        {!isCurrent && period.preset !== 'perso' && <Button variant="discret" onClick={() => onChange(periodAt(period.preset, new Date()))}>Revenir à aujourd’hui</Button>}
+        {isCurrent && len > 1 && <span className="text-xs text-mab-texte">Jour {elapsed} / {len}{period.preset === 'mois' ? ' · projection fin de mois au rythme actuel' : ''}</span>}
+      </div>
     </div>
   );
 }
