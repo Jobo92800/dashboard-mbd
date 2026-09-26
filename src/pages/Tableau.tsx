@@ -129,7 +129,8 @@ export default function Tableau() {
             {KEYS.map((k, i) => {
               const v = t(k.id);
               const p = sum(data.prev, k.id);
-              const delta = p ? Math.round(((v - p) / p) * 100) : null;
+              // Pas de comparaison sur les prospects : ceux passés en « Perdu » disparaissent de leur mois d'origine.
+              const delta = p && k.id !== 'leads' ? Math.round(((v - p) / p) * 100) : null;
               const obj = objTotal(k.obj);
               const first = i === 0 || KEYS[i - 1].step !== k.step;
               return (
@@ -162,7 +163,7 @@ export default function Tableau() {
                 <h3 className="mb-3 text-lg font-semibold">Bilans placés par commerciale</h3>
                 <HBars rows={Object.entries(data.commerciales).filter(([, s]) => s.bilans).sort((a, b) => b[1].bilans - a[1].bilans).map(([name, s]) => ({
                   name, value: s.bilans,
-                  extra: [s.joints ? `${pct(s.bilans, s.joints)} % des joints` : null, `${s.venus} venu${s.venus > 1 ? 's' : ''}`, s.annules ? `${s.annules} annulé${s.annules > 1 ? 's' : ''}` : null, s.manques ? `${s.manques} absent${s.manques > 1 ? 's' : ''}` : null].filter(Boolean).join(' · '),
+                  extra: [s.leads ? `${plural(s.joints, 'joint')} sur ${s.leads} prospects` : null, `${s.venus} venu${s.venus > 1 ? 's' : ''}`, s.annules ? `${s.annules} annulé${s.annules > 1 ? 's' : ''}` : null, s.manques ? `${s.manques} absent${s.manques > 1 ? 's' : ''}` : null].filter(Boolean).join(' · '),
                 }))} />
                 <p className="mt-3 text-xs text-mab-gris-doux">« Venus » : bilans placés ce mois-ci dont la cliente est déjà passée en centre. Les autres ont leur rendez-vous plus tard.</p>
               </Card>
@@ -203,7 +204,7 @@ export default function Tableau() {
             <DailyBars month={month} values={data.leadsParJour} />
           </Card>
 
-          <p className="mt-4 text-xs text-mab-gris-doux">Données Airtable lues le {format(new Date(data.updatedAt), "d MMMM 'à' HH:mm", { locale: fr })} (mises en cache 5 min). Téléphone : fiches CRM 2026 créées ce mois-ci, y compris celles passées en « Perdu / Injoignable » ; un bilan compte au jour où il est placé. Centre : fiches clientes CRM News dont le bilan a eu lieu ce mois-ci ; une cure est vendue quand un montant de cure est renseigné.</p>
+          <p className="mt-4 text-xs text-mab-gris-doux">Données Airtable lues le {format(new Date(data.updatedAt), "d MMMM 'à' HH:mm", { locale: fr })} (mises en cache 5 min). Téléphone : prospects arrivés ce mois-ci dans CRM 2026 (hors fiches déjà passées en « Perdu / Injoignable », qui perdent leur date d’arrivée) ; un bilan compte le jour où il est placé, même pour un prospect arrivé avant. Centre : fiches clientes CRM News dont le bilan a eu lieu ce mois-ci ; une cure est vendue quand un montant de cure est renseigné.</p>
         </>
       )}
 

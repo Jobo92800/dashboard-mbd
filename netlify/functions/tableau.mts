@@ -41,10 +41,12 @@ const prevMonth = (m: string) => {
   return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, '0')}`;
 };
 
-/** « Malvina, Alex » → ['Malvina', 'Alex'] ; « marie-san » → « Marie-san ». */
+/** « Malvina, Alex » → ['Malvina', 'Alex'] ; « MARIE SAN », « marie-san » → « Marie-San » ; « Alexandra 2 » → « Alexandra ». */
 function people(v: unknown) {
-  return String(v ?? '').split(/,|&|\/|\bet\b/i).map((s) => s.trim()).filter(Boolean)
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1));
+  return String(v ?? '').split(/,|&|\/|\bet\b/i)
+    .map((s) => s.toLowerCase().replace(/\d+/g, '').replace(/[\s_-]+/g, ' ').trim())
+    .filter(Boolean)
+    .map((s) => s.split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('-'));
 }
 
 async function fetchAll(base: string, table: string, fields: string[], formula: string) {
@@ -68,8 +70,10 @@ async function fetchAll(base: string, table: string, fields: string[], formula: 
   return out;
 }
 
+/** Le IF est indispensable : sur une date vide, DATETIME_FORMAT renvoie une erreur
+ *  qui fait écarter la fiche entière, même quand l'autre moitié du OR est vraie. */
 const inMonths = (field: string, months: string[]) =>
-  `OR(${months.map((m) => `DATETIME_FORMAT(SET_TIMEZONE({${field}},'Europe/Paris'),'YYYY-MM')='${m}'`).join(',')})`;
+  `OR(${months.map((m) => `IF({${field}},DATETIME_FORMAT(SET_TIMEZONE({${field}},'Europe/Paris'),'YYYY-MM'),'')='${m}'`).join(',')})`;
 
 /** Par centre et par mois. */
 type Stat = { leads: number; joints: number; bilans: number; realises: number; cures: number; ca: number; caBilans: number };
@@ -92,14 +96,25 @@ export default async (req: Request) => {
   const hit = cache.get(month);
   if (hit && !fresh && Date.now() - hit.at < 5 * 60_000) return json(200, hit.data);
 
-  const months = [month, prevMonth(month)];
   try {
+    const data = await compute(month);
+    cache.set(month, { at: Date.now(), data });
+    return json(200, data);
+  } catch (e) {
+    console.error(e);
+    return json(502, { error: (e as Error).message });
+  }
+};
+
+export async function compute(month: string) {
+  const months = [month, prevMonth(month)];
+  {
     const phoneFields = ['Centre', 'Création', 'Source', 'Commercial', 'Statut', 'Date Bilan Placé', 'Répondu Appel 1', 'Répondu Appel 2', 'Répondu Appel 3'];
     const [master, perdus, clients] = await Promise.all([
       fetchAll(CRM, MASTER, phoneFields, `OR(${inMonths('Création', months)},${inMonths('Date Bilan Placé', months)})`),
       fetchAll(CRM, PERDU, phoneFields, `OR(${inMonths('Création', months)},${inMonths('Date Bilan Placé', months)})`),
       fetchAll(NEWS, CLIENTS, ['Centre', 'Thérapeute', 'Date bilan', 'date de création', 'Bilan seul', ...CURES],
-        `OR(${inMonths('Date bilan', months)},AND({Date bilan}=BLANK(),${inMonths('date de création', months)}))`),
+        `OR(${inMonths('Date bilan', months)},AND(NOT({Date bilan}),${inMonths('date de création', months)}))`),
     ]);
 
     const byMonth: Record<string, Record<string, Stat>> = {};
@@ -110,7 +125,10 @@ export default async (req: Request) => {
     const leadsParJour: Record<string, number> = {};
     const com = (n: string) => (commerciales[n] ??= { leads: 0, joints: 0, bilans: 0, venus: 0, annules: 0, manques: 0, cures: 0 });
 
-    // ① Téléphone
+    // ① Téléphone. Les fiches de « Perdu / Injoignable » sont recréées au moment où on les
+    // y déplace : leur date de création n'est pas celle de l'arrivée du prospect, elles ne
+    // comptent donc pas comme prospects du mois (seulement pour les bilans placés).
+    const fromMaster = new Set(master);
     for (const r of [...master, ...perdus]) {
       const f = r.fields;
       const c = centreOf(f['Centre']);
@@ -118,7 +136,7 @@ export default async (req: Request) => {
       const src = String(f['Source'] ?? '').trim() || 'Non renseignée';
       const joint = Boolean(f['Répondu Appel 1'] || f['Répondu Appel 2'] || f['Répondu Appel 3']);
       const created = monthOf(f['Création']);
-      if (created && months.includes(created)) {
+      if (created && months.includes(created) && fromMaster.has(r)) {
         const s = bucket(created, c);
         s.leads++;
         if (joint) s.joints++;
@@ -165,7 +183,7 @@ export default async (req: Request) => {
       }
     }
 
-    const data = {
+    return {
       month,
       previous: months[1],
       centres: CENTRES,
@@ -177,10 +195,5 @@ export default async (req: Request) => {
       leadsParJour,
       updatedAt: new Date().toISOString(),
     };
-    cache.set(month, { at: Date.now(), data });
-    return json(200, data);
-  } catch (e) {
-    console.error(e);
-    return json(502, { error: (e as Error).message });
   }
-};
+}
