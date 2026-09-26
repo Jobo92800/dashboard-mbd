@@ -1,18 +1,23 @@
-// Tableau de bord direction : chiffres par centre et par mois, lus dans Airtable
-// (base « CRM 2026 », table « Prospects Master » + « Perdu / Injoignable »).
+// Tableau de bord direction, en deux temps comme le parcours réel :
+//  ① Téléphone (commerciales) — base « CRM 2026 » : prospects → joints → bilans placés.
+//  ② Centre (thérapeutes) — base « CRM News », table Clients : une fiche par bilan
+//     réalisé en centre ; une cure est vendue quand « Montant Cure » est renseigné.
 // Réservé aux administrateurs. GET ?mois=AAAA-MM
 import { callerProfile, json } from '../lib/server.mts';
 
-const BASE = process.env.AIRTABLE_BASE_ID || 'appNML7rJEKiWkuVg';
+const CRM = process.env.AIRTABLE_BASE_ID || 'appNML7rJEKiWkuVg';
 const MASTER = process.env.AIRTABLE_TABLE_ID || 'tblgCdNITlPy74Z5G';
 const PERDU = 'tblSyB6j2gvKtvo4Y';
+const NEWS = process.env.AIRTABLE_CLIENTS_BASE_ID || 'appI97jEL2mSCg3Wc';
+const CLIENTS = 'tblfqxwGePzeiWqqY';
 const CENTRES = ['Le Grau-du-Roi', 'Le Crès', 'Sérignan', 'Cabestany', 'Avignon'] as const;
+const CURES = ['Montant Cure', ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Montant cure ${n}`)];
 
 type Rec = { fields: Record<string, unknown> };
 
 /** « LGR », « Grau-du-Roi », « Le Grau-du-Roi (30) » → « Le Grau-du-Roi ». */
 function centreOf(v: unknown) {
-  const s = String(v ?? '').toLowerCase();
+  const s = String((v as { name?: string })?.name ?? v ?? '').toLowerCase();
   if (/grau|lgr/.test(s)) return 'Le Grau-du-Roi';
   if (/cr[eè]s/.test(s)) return 'Le Crès';
   if (/s[ée]rignan/.test(s)) return 'Sérignan';
@@ -29,13 +34,20 @@ function monthOf(v: unknown) {
   if (Number.isNaN(d.getTime())) return null;
   return new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).format(d).slice(0, 7);
 }
+const dayOf = (v: unknown) => new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date(String(v)));
 
 const prevMonth = (m: string) => {
   const [y, mo] = m.split('-').map(Number);
   return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, '0')}`;
 };
 
-async function fetchAll(table: string, fields: string[], formula: string) {
+/** « Malvina, Alex » → ['Malvina', 'Alex'] ; « marie-san » → « Marie-san ». */
+function people(v: unknown) {
+  return String(v ?? '').split(/,|&|\/|\bet\b/i).map((s) => s.trim()).filter(Boolean)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1));
+}
+
+async function fetchAll(base: string, table: string, fields: string[], formula: string) {
   const token = process.env.AIRTABLE_TOKEN;
   const out: Rec[] = [];
   let offset = '';
@@ -43,8 +55,11 @@ async function fetchAll(table: string, fields: string[], formula: string) {
     const q = new URLSearchParams({ filterByFormula: formula, pageSize: '100' });
     fields.forEach((f) => q.append('fields[]', f));
     if (offset) q.set('offset', offset);
-    const res = await fetch(`https://api.airtable.com/v0/${BASE}/${table}?${q}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) throw new Error(`Airtable ${res.status} : ${(await res.text()).slice(0, 200)}`);
+    const res = await fetch(`https://api.airtable.com/v0/${base}/${table}?${q}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      if ((res.status === 403 || res.status === 404) && base === NEWS) throw new Error('Le jeton Airtable n’a pas accès à la base « CRM News ». Ajoute-la au jeton sur airtable.com/create/tokens.');
+      throw new Error(`Airtable ${res.status} : ${(await res.text()).slice(0, 200)}`);
+    }
     const body = await res.json() as { records: Rec[]; offset?: string };
     out.push(...body.records);
     if (!body.offset) break;
@@ -56,8 +71,12 @@ async function fetchAll(table: string, fields: string[], formula: string) {
 const inMonths = (field: string, months: string[]) =>
   `OR(${months.map((m) => `DATETIME_FORMAT(SET_TIMEZONE({${field}},'Europe/Paris'),'YYYY-MM')='${m}'`).join(',')})`;
 
-type Stat = { leads: number; bilans: number; conversions: number; ca: number };
-const empty = (): Stat => ({ leads: 0, bilans: 0, conversions: 0, ca: 0 });
+/** Par centre et par mois. */
+type Stat = { leads: number; joints: number; bilans: number; realises: number; cures: number; ca: number; caBilans: number };
+const empty = (): Stat => ({ leads: 0, joints: 0, bilans: 0, realises: 0, cures: 0, ca: 0, caBilans: 0 });
+/** Sort des bilans placés par une commerciale. */
+type Commerciale = { leads: number; joints: number; bilans: number; venus: number; annules: number; manques: number; cures: number };
+type Therapeute = { bilans: number; cures: number; ca: number };
 
 const cache = new Map<string, { at: number; data: unknown }>();
 
@@ -75,50 +94,73 @@ export default async (req: Request) => {
 
   const months = [month, prevMonth(month)];
   try {
-    const fields = ['Centre', 'Création', 'Date Bilan Placé', 'Date Converti', 'Date de convertion', 'Montant Cure', 'Source', 'Commercial'];
-    const [master, perdus] = await Promise.all([
-      fetchAll(MASTER, fields, `OR(${inMonths('Création', months)},${inMonths('Date Bilan Placé', months)},${inMonths('Date Converti', months)})`),
-      fetchAll(PERDU, ['Centre', 'Création', 'Source'], inMonths('Création', months)),
+    const phoneFields = ['Centre', 'Création', 'Source', 'Commercial', 'Statut', 'Date Bilan Placé', 'Répondu Appel 1', 'Répondu Appel 2', 'Répondu Appel 3'];
+    const [master, perdus, clients] = await Promise.all([
+      fetchAll(CRM, MASTER, phoneFields, `OR(${inMonths('Création', months)},${inMonths('Date Bilan Placé', months)})`),
+      fetchAll(CRM, PERDU, phoneFields, `OR(${inMonths('Création', months)},${inMonths('Date Bilan Placé', months)})`),
+      fetchAll(NEWS, CLIENTS, ['Centre', 'Thérapeute', 'Date bilan', 'date de création', 'Bilan seul', ...CURES],
+        `OR(${inMonths('Date bilan', months)},AND({Date bilan}=BLANK(),${inMonths('date de création', months)}))`),
     ]);
 
     const byMonth: Record<string, Record<string, Stat>> = {};
     const bucket = (m: string, c: string) => ((byMonth[m] ??= {})[c] ??= empty());
-    const sources: Record<string, { leads: number; conversions: number }> = {};
-    const commerciaux: Record<string, { bilans: number; conversions: number }> = {};
+    const sources: Record<string, { leads: number; bilans: number }> = {};
+    const commerciales: Record<string, Commerciale> = {};
+    const therapeutes: Record<string, Therapeute> = {};
     const leadsParJour: Record<string, number> = {};
+    const com = (n: string) => (commerciales[n] ??= { leads: 0, joints: 0, bilans: 0, venus: 0, annules: 0, manques: 0, cures: 0 });
 
+    // ① Téléphone
     for (const r of [...master, ...perdus]) {
       const f = r.fields;
       const c = centreOf(f['Centre']);
+      const who = String(f['Commercial'] ?? '').trim() || 'Non attribué';
+      const src = String(f['Source'] ?? '').trim() || 'Non renseignée';
+      const joint = Boolean(f['Répondu Appel 1'] || f['Répondu Appel 2'] || f['Répondu Appel 3']);
       const created = monthOf(f['Création']);
       if (created && months.includes(created)) {
-        bucket(created, c).leads++;
+        const s = bucket(created, c);
+        s.leads++;
+        if (joint) s.joints++;
         if (created === month) {
-          const src = String(f['Source'] ?? 'Non renseignée');
-          (sources[src] ??= { leads: 0, conversions: 0 }).leads++;
-          const day = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date(String(f['Création'])));
-          leadsParJour[day] = (leadsParJour[day] ?? 0) + 1;
+          (sources[src] ??= { leads: 0, bilans: 0 }).leads++;
+          leadsParJour[dayOf(f['Création'])] = (leadsParJour[dayOf(f['Création'])] ?? 0) + 1;
+          if (who !== 'Non attribué') { com(who).leads++; if (joint) com(who).joints++; }
+        }
+      }
+      const placed = monthOf(f['Date Bilan Placé']);
+      if (placed && months.includes(placed)) {
+        bucket(placed, c).bilans++;
+        if (placed === month) {
+          (sources[src] ??= { leads: 0, bilans: 0 }).bilans++;
+          const k = com(who);
+          k.bilans++;
+          const statut = String(f['Statut'] ?? '').trim();
+          if (statut === 'Converti' || statut === 'Non convertie') k.venus++;
+          if (statut === 'Converti') k.cures++;
+          if (statut.startsWith('Bilan annulé')) k.annules++;
+          if (statut === 'RDV manqué') k.manques++;
         }
       }
     }
-    for (const r of master) {
+
+    // ② Centre
+    for (const r of clients) {
       const f = r.fields;
-      const c = centreOf(f['Centre']);
-      const who = String(f['Commercial'] ?? 'Non attribué');
-      const b = monthOf(f['Date Bilan Placé']);
-      if (b && months.includes(b)) {
-        bucket(b, c).bilans++;
-        if (b === month) (commerciaux[who] ??= { bilans: 0, conversions: 0 }).bilans++;
-      }
-      const cv = monthOf(f['Date Converti']) ?? monthOf(f['Date de convertion']);
-      if (cv && months.includes(cv)) {
-        const s = bucket(cv, c);
-        s.conversions++;
-        s.ca += Number(f['Montant Cure'] ?? 0) || 0;
-        if (cv === month) {
-          (commerciaux[who] ??= { bilans: 0, conversions: 0 }).conversions++;
-          const src = String(f['Source'] ?? 'Non renseignée');
-          (sources[src] ??= { leads: 0, conversions: 0 }).conversions++;
+      const m = monthOf(f['Date bilan']) ?? monthOf(f['date de création']);
+      if (!m || !months.includes(m)) continue;
+      const s = bucket(m, centreOf(f['Centre']));
+      const cure = CURES.reduce((t, k) => t + (Number(f[k]) || 0), 0);
+      const bilanSeul = Number(f['Bilan seul']) || 0;
+      s.realises++;
+      s.caBilans += bilanSeul;
+      if (cure > 0) { s.cures++; s.ca += cure; }
+      if (m === month) {
+        const names = people(f['Thérapeute']);
+        for (const n of names.length ? names : ['Non renseignée']) {
+          const t = (therapeutes[n] ??= { bilans: 0, cures: 0, ca: 0 });
+          t.bilans++;
+          if (cure > 0) { t.cures++; t.ca += cure / Math.max(1, names.length); }
         }
       }
     }
@@ -130,7 +172,8 @@ export default async (req: Request) => {
       current: byMonth[month] ?? {},
       prev: byMonth[months[1]] ?? {},
       sources,
-      commerciaux,
+      commerciales,
+      therapeutes,
       leadsParJour,
       updatedAt: new Date().toISOString(),
     };
