@@ -1,5 +1,6 @@
 // Tableau de bord direction, en deux temps comme le parcours réel :
-//  ① Téléphone (commerciales) — base « CRM 2026 » : prospects → joints → bilans placés.
+//  ① Téléphone (commerciales) — base « CRM 2026 » : prospects reçus, appels passés
+//     (1er / 2e / 3e appel datés dans la période) dont décrochés, puis bilans placés.
 //  ② Centre (thérapeutes) — base « CRM News », table Clients : une fiche par bilan
 //     réalisé en centre ; une cure est vendue quand « Montant Cure » est renseigné.
 // Réservé aux administrateurs. GET ?du=AAAA-MM-JJ&au=AAAA-MM-JJ (ou ?mois=AAAA-MM).
@@ -8,10 +9,11 @@ import { callerProfile, json } from '../lib/server.mts';
 
 const CRM = process.env.AIRTABLE_BASE_ID || 'appNML7rJEKiWkuVg';
 const MASTER = process.env.AIRTABLE_TABLE_ID || 'tblgCdNITlPy74Z5G';
-const PERDU = 'tblSyB6j2gvKtvo4Y';
 const NEWS = process.env.AIRTABLE_CLIENTS_BASE_ID || 'appI97jEL2mSCg3Wc';
 const CLIENTS = 'tblfqxwGePzeiWqqY';
 const CENTRES = ['Le Grau-du-Roi', 'Le Crès', 'Sérignan', 'Cabestany', 'Avignon'] as const;
+/** Les trois tentatives d'appel : [date de l'appel, case « a décroché »]. */
+const CALLS = [['1er Appel', 'Répondu Appel 1'], ['2ème Appel', 'Répondu Appel 2'], ['3ème Appel', 'Répondu Appel 3']] as const;
 const CURES = ['Montant Cure', ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Montant cure ${n}`)];
 
 type Rec = { fields: Record<string, unknown> };
@@ -79,10 +81,10 @@ const between = (field: string, from: string, to: string) => {
 };
 
 /** Par centre et par mois. */
-type Stat = { leads: number; joints: number; bilans: number; realises: number; cures: number; ca: number; caBilans: number };
-const empty = (): Stat => ({ leads: 0, joints: 0, bilans: 0, realises: 0, cures: 0, ca: 0, caBilans: 0 });
+type Stat = { leads: number; appels: number; appeles: number; joints: number; bilans: number; realises: number; cures: number; ca: number; caBilans: number };
+const empty = (): Stat => ({ leads: 0, appels: 0, appeles: 0, joints: 0, bilans: 0, realises: 0, cures: 0, ca: 0, caBilans: 0 });
 /** Sort des bilans placés par une commerciale. */
-type Commerciale = { leads: number; joints: number; bilans: number; venus: number; annules: number; manques: number; cures: number };
+type Commerciale = { leads: number; appels: number; appeles: number; joints: number; bilans: number; venus: number; annules: number; manques: number; cures: number };
 type Therapeute = { bilans: number; cures: number; ca: number };
 
 const cache = new Map<string, { at: number; data: unknown }>();
@@ -128,10 +130,10 @@ export async function compute(from: string, to: string) {
   /** 'cur' pour la période choisie, 'prev' pour la période d'avant, null sinon. */
   const period = (d: string | null) => (!d ? null : d >= from && d <= to ? 'cur' : d >= prevFrom && d <= prevTo ? 'prev' : null);
   {
-    const phoneFields = ['Centre', 'Création', 'Source', 'Commercial', 'Statut', 'Date Bilan Placé', 'Répondu Appel 1', 'Répondu Appel 2', 'Répondu Appel 3'];
-    const [master, perdus, clients] = await Promise.all([
-      fetchAll(CRM, MASTER, phoneFields, `OR(${between('Création', prevFrom, to)},${between('Date Bilan Placé', prevFrom, to)})`),
-      fetchAll(CRM, PERDU, phoneFields, between('Date Bilan Placé', prevFrom, to)),
+    const phoneFields = ['Centre', 'Création', 'Source', 'Commercial', 'Statut', 'Date Bilan Placé', ...CALLS.flat()];
+    const phoneDates = ['Création', 'Date Bilan Placé', ...CALLS.map(([d]) => d)];
+    const [master, clients] = await Promise.all([
+      fetchAll(CRM, MASTER, phoneFields, `OR(${phoneDates.map((d) => between(d, prevFrom, to)).join(',')})`),
       fetchAll(NEWS, CLIENTS, ['Centre', 'Thérapeute', 'Date bilan', 'date de création', 'Bilan seul', ...CURES],
         `OR(${between('Date bilan', prevFrom, to)},AND(NOT({Date bilan}),${between('date de création', prevFrom, to)}))`),
     ]);
@@ -142,29 +144,33 @@ export async function compute(from: string, to: string) {
     const commerciales: Record<string, Commerciale> = {};
     const therapeutes: Record<string, Therapeute> = {};
     const leadsParJour: Record<string, number> = {};
-    const com = (n: string) => (commerciales[n] ??= { leads: 0, joints: 0, bilans: 0, venus: 0, annules: 0, manques: 0, cures: 0 });
+    const com = (n: string) => (commerciales[n] ??= { leads: 0, appels: 0, appeles: 0, joints: 0, bilans: 0, venus: 0, annules: 0, manques: 0, cures: 0 });
 
-    // ① Téléphone. Les fiches de « Perdu / Injoignable » sont recréées au moment où on les
-    // y déplace : leur date de création n'est pas celle de l'arrivée du prospect, elles ne
-    // comptent donc pas comme prospects du mois (seulement pour les bilans placés).
-    const fromMaster = new Set(master);
-    for (const r of [...master, ...perdus]) {
+    // ① Téléphone. Seule « Prospects Master » compte : les perdus / injoignables y restent,
+    // la table « Perdu / Injoignable » n'en est qu'une copie partielle.
+    for (const r of master) {
       const f = r.fields;
       const c = centreOf(f['Centre']);
       const who = String(f['Commercial'] ?? '').trim() || 'Non attribué';
       const src = String(f['Source'] ?? '').trim() || 'Non renseignée';
-      const joint = Boolean(f['Répondu Appel 1'] || f['Répondu Appel 2'] || f['Répondu Appel 3']);
       const createdDay = dayOf(f['Création']);
       const created = period(createdDay);
-      if (created && fromMaster.has(r)) {
-        const s = bucket(created, c);
-        s.leads++;
-        if (joint) s.joints++;
+      if (created) {
+        bucket(created, c).leads++;
         if (created === 'cur') {
           (sources[src] ??= { leads: 0, bilans: 0 }).leads++;
           leadsParJour[createdDay!] = (leadsParJour[createdDay!] ?? 0) + 1;
-          if (who !== 'Non attribué') { com(who).leads++; if (joint) com(who).joints++; }
+          if (who !== 'Non attribué') com(who).leads++;
         }
+      }
+      // Appels passés dans la période, quel que soit le jour d'arrivée du prospect.
+      for (const p of ['cur', 'prev'] as const) {
+        const calls = CALLS.filter(([d]) => period(dayOf(f[d])) === p);
+        if (!calls.length) continue;
+        const answered = calls.some(([, rep]) => Boolean(f[rep]));
+        const s = bucket(p, c);
+        s.appels += calls.length; s.appeles++; if (answered) s.joints++;
+        if (p === 'cur') { const k = com(who); k.appels += calls.length; k.appeles++; if (answered) k.joints++; }
       }
       const placed = period(dayOf(f['Date Bilan Placé']));
       if (placed) {

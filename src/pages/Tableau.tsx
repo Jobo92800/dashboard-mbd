@@ -9,8 +9,8 @@ import { isAdmin } from '../lib/permissions';
 import type { Objective } from '../lib/types';
 import { Button, Card, Empty, IconButton, Input, Modal, PageTitle, Surtitre } from '../components/ui';
 
-type Stat = { leads: number; joints: number; bilans: number; realises: number; cures: number; ca: number; caBilans: number };
-type Commerciale = { leads: number; joints: number; bilans: number; venus: number; annules: number; manques: number; cures: number };
+type Stat = { leads: number; appels: number; appeles: number; joints: number; bilans: number; realises: number; cures: number; ca: number; caBilans: number };
+type Commerciale = { leads: number; appels: number; appeles: number; joints: number; bilans: number; venus: number; annules: number; manques: number; cures: number };
 type Therapeute = { bilans: number; cures: number; ca: number };
 type Data = {
   from: string; to: string; prevFrom: string; prevTo: string; centres: string[];
@@ -84,11 +84,11 @@ function demoData(from: string, to: string): Data {
   const len = differenceInCalendarDays(parseISO(to), parseISO(from)) + 1;
   const k = Math.min(1, len / 30);
   const base: Record<string, Stat> = {
-    'Le Grau-du-Roi': { leads: 111, joints: 70, bilans: 18, realises: 16, cures: 11, ca: 14800, caBilans: 390 },
-    'Le Crès': { leads: 72, joints: 45, bilans: 17, realises: 14, cures: 8, ca: 11600, caBilans: 520 },
-    'Sérignan': { leads: 152, joints: 96, bilans: 25, realises: 19, cures: 12, ca: 13900, caBilans: 480 },
-    'Cabestany': { leads: 129, joints: 80, bilans: 23, realises: 15, cures: 7, ca: 9800, caBilans: 770 },
-    'Avignon': { leads: 125, joints: 83, bilans: 31, realises: 24, cures: 14, ca: 21400, caBilans: 390 },
+    'Le Grau-du-Roi': { leads: 111, appels: 210, appeles: 144, joints: 70, bilans: 18, realises: 16, cures: 11, ca: 14800, caBilans: 390 },
+    'Le Crès': { leads: 72, appels: 136, appeles: 93, joints: 45, bilans: 17, realises: 14, cures: 8, ca: 11600, caBilans: 520 },
+    'Sérignan': { leads: 152, appels: 288, appeles: 197, joints: 96, bilans: 25, realises: 19, cures: 12, ca: 13900, caBilans: 480 },
+    'Cabestany': { leads: 129, appels: 245, appeles: 167, joints: 80, bilans: 23, realises: 15, cures: 7, ca: 9800, caBilans: 770 },
+    'Avignon': { leads: 125, appels: 237, appeles: 162, joints: 83, bilans: 31, realises: 24, cures: 14, ca: 21400, caBilans: 390 },
   };
   for (const s of Object.values(base)) for (const key of Object.keys(s) as (keyof Stat)[]) s[key] = Math.round(s[key] * k);
   const prev = Object.fromEntries(Object.entries(base).map(([c, s]) => [c, Object.fromEntries(Object.entries(s).map(([k, v]) => [k, Math.round(v * 0.85)])) as Stat]));
@@ -96,9 +96,9 @@ function demoData(from: string, to: string): Data {
     from, to, prevFrom: iso(addDays(parseISO(from), -len)), prevTo: iso(addDays(parseISO(from), -1)), centres: CENTRES, current: base, prev,
     sources: { 'Facebook Ads': { leads: 402, bilans: 71 }, 'LP-Google': { leads: 88, bilans: 19 }, 'Bioportrait': { leads: 54, bilans: 14 }, 'Site Web': { leads: 29, bilans: 6 }, 'Instagram Ads': { leads: 16, bilans: 4 } },
     commerciales: {
-      Marie: { leads: 210, joints: 140, bilans: 41, venus: 22, annules: 3, manques: 2, cures: 13 },
-      Leslie: { leads: 180, joints: 115, bilans: 33, venus: 18, annules: 4, manques: 1, cures: 9 },
-      Alex: { leads: 90, joints: 60, bilans: 16, venus: 7, annules: 1, manques: 1, cures: 4 },
+      Marie: { leads: 210, appels: 399, appeles: 273, joints: 140, bilans: 41, venus: 22, annules: 3, manques: 2, cures: 13 },
+      Leslie: { leads: 180, appels: 342, appeles: 234, joints: 115, bilans: 33, venus: 18, annules: 4, manques: 1, cures: 9 },
+      Alex: { leads: 90, appels: 171, appeles: 117, joints: 60, bilans: 16, venus: 7, annules: 1, manques: 1, cures: 4 },
     },
     therapeutes: {
       Laura: { bilans: 12, cures: 8, ca: 11200 }, Caroll: { bilans: 11, cures: 7, ca: 7900 }, Marie: { bilans: 10, cures: 6, ca: 8100 },
@@ -191,20 +191,20 @@ export default function Tableau() {
           {/* ① Téléphone */}
           <section className="mb-8">
             <Surtitre>① Au téléphone · les commerciales</Surtitre>
-            <h2 className="mb-3 mt-1 text-xl font-light">Des prospects aux <b className="font-semibold">bilans placés</b></h2>
+            <h2 className="mb-3 mt-1 text-xl font-light">Des appels aux <b className="font-semibold">bilans placés</b></h2>
             <div className="mb-4 grid grid-cols-3 gap-3">
-              <Rate label="Prospects joints" value={pct(t('joints'), t('leads'))} hint={`${t('joints')} sur ${t('leads')}`} />
-              <Rate label="Joint → bilan placé" value={pct(t('bilans'), t('joints'))} hint={`${t('bilans')} bilans`} />
-              <Rate label="Prospect → bilan placé" value={pct(t('bilans'), t('leads'))} hint="taux global" />
+              <Card className="px-4 py-3"><p className="text-xs text-mab-texte">Prospects appelés</p><p className="text-xl font-light tabular-nums">{t('appeles')}</p><p className="text-[11px] text-mab-gris-doux">{plural(t('appels'), 'appel')} passé{t('appels') > 1 ? 's' : ''}</p></Card>
+              <Rate label="Ont décroché" value={pct(t('joints'), t('appeles'))} hint={`${t('joints')} sur ${t('appeles')} appelés`} />
+              <Rate label="Décroché → bilan placé" value={pct(t('bilans'), t('joints'))} hint={`${plural(t('bilans'), 'bilan')} placé${t('bilans') > 1 ? 's' : ''}`} />
             </div>
             <div className="grid gap-6 lg:grid-cols-2">
               <Card className="p-5">
-                <h3 className="mb-3 text-lg font-semibold">Bilans placés par commerciale</h3>
-                <HBars rows={Object.entries(data.commerciales).filter(([, s]) => s.bilans).sort((a, b) => b[1].bilans - a[1].bilans).map(([name, s]) => ({
+                <h3 className="mb-3 text-lg font-semibold">Activité par commerciale</h3>
+                <HBars rows={Object.entries(data.commerciales).filter(([n, s]) => n !== 'Non attribué' && (s.bilans || s.appeles)).sort((a, b) => b[1].bilans - a[1].bilans || b[1].appeles - a[1].appeles).map(([name, s]) => ({
                   name, value: s.bilans,
-                  extra: [s.leads ? `${plural(s.joints, 'joint')} sur ${s.leads} prospects` : null, `${s.venus} venu${s.venus > 1 ? 's' : ''}`, s.annules ? `${s.annules} annulé${s.annules > 1 ? 's' : ''}` : null, s.manques ? `${s.manques} absent${s.manques > 1 ? 's' : ''}` : null].filter(Boolean).join(' · '),
+                  extra: [`${s.appeles} appelé${s.appeles > 1 ? 's' : ''}`, `${s.joints} décroché${s.joints > 1 ? 's' : ''}`, s.bilans ? `${s.venus} venu${s.venus > 1 ? 's' : ''}` : null, s.annules ? `${s.annules} annulé${s.annules > 1 ? 's' : ''}` : null, s.manques ? `${s.manques} absent${s.manques > 1 ? 's' : ''}` : null].filter(Boolean).join(' · '),
                 }))} />
-                <p className="mt-3 text-xs text-mab-gris-doux">« Venus » : bilans placés sur la période dont la cliente est déjà passée en centre. Les autres ont leur rendez-vous plus tard.</p>
+                <p className="mt-3 text-xs text-mab-gris-doux">Le grand chiffre = bilans placés. « Appelés » : prospects appelés sur la période (1er, 2e ou 3e appel), qu’ils soient arrivés ce jour-là ou avant ; « décrochés » : ceux qui ont répondu. « Venus » : bilans placés dont la cliente est déjà passée en centre.</p>
               </Card>
               <Card className="p-5">
                 <h3 className="mb-3 text-lg font-semibold">D’où viennent les prospects</h3>
@@ -243,7 +243,7 @@ export default function Tableau() {
             <DailyBars from={period.from} to={period.to} values={data.leadsParJour} />
           </Card>}
 
-          <p className="mt-4 text-xs text-mab-gris-doux">Données Airtable lues le {format(new Date(data.updatedAt), "d MMMM 'à' HH:mm", { locale: fr })} (mises en cache 5 min). Téléphone : prospects arrivés sur la période dans CRM 2026 (hors fiches déjà passées en « Perdu / Injoignable », qui perdent leur date d’arrivée) ; un bilan compte le jour où il est placé, même pour un prospect arrivé avant. Centre : fiches clientes CRM News dont le bilan a eu lieu sur la période ; une cure est vendue quand un montant de cure est renseigné.</p>
+          <p className="mt-4 text-xs text-mab-gris-doux">Données Airtable lues le {format(new Date(data.updatedAt), "d MMMM 'à' HH:mm", { locale: fr })} (mises en cache 5 min). Téléphone : prospects arrivés sur la période dans « Prospects Master » ; un appel compte le jour où il est passé et un bilan le jour où il est placé, même pour un prospect arrivé avant. Centre : fiches clientes CRM News dont le bilan a eu lieu sur la période ; une cure est vendue quand un montant de cure est renseigné.</p>
         </>
       )}
 
@@ -287,7 +287,7 @@ const COLS: { id: keyof Stat; label: string; obj?: keyof Objective }[] = [
 function CentreTable({ data, objectives, project, isCurrent }: { data: Data; objectives: Map<string, Objective>; project: (n: number) => number; isCurrent: boolean }) {
   const rows = [...CENTRES, ...Object.keys(data.current).filter((c) => !CENTRES.includes(c))];
   const max = (k: keyof Stat) => Math.max(1, ...rows.map((c) => data.current[c]?.[k] ?? 0));
-  const stat = (c: string): Stat => data.current[c] ?? { leads: 0, joints: 0, bilans: 0, realises: 0, cures: 0, ca: 0, caBilans: 0 };
+  const stat = (c: string): Stat => data.current[c] ?? { leads: 0, appels: 0, appeles: 0, joints: 0, bilans: 0, realises: 0, cures: 0, ca: 0, caBilans: 0 };
   const cell = (c: string, col: typeof COLS[number]) => {
     const v = stat(c)[col.id] ?? 0;
     const goal = col.obj ? (objectives.get(c)?.[col.obj] as number | null | undefined) : null;
