@@ -2,26 +2,34 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Archive, ArrowDown, ArrowLeft, ArrowUp, CheckCheck, Copy, LayoutTemplate, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../state/store';
-import type { Project, Task, TaskStatus } from '../lib/types';
+import type { Project, Task } from '../lib/types';
+import { BoardView, CalendarView, DashboardView, ListView, NO_PHASE, TimelineView } from '../components/ProjectViews';
 import { daysUntil, fmtShort, fmtStamp } from '../lib/dates';
 import { isDone, isLate, progress, projectHealth, sortTasks } from '../lib/selectors';
 import { isAdmin, isProjectMember } from '../lib/permissions';
-import { AssigneeStack, TaskRow, StatusCheck, TaskMeta } from '../components/TaskRow';
 import { TaskModal, type TaskDraft } from '../components/TaskModal';
 import { ProjectModal } from '../components/ProjectModal';
 import { DuplicateModal, SaveTemplateModal } from '../components/TemplateModals';
 import { Comments } from '../components/Comments';
-import { ActionMenu, Avatar, AvatarStack, Badge, Button, Card, Empty, Modal, Progress, Select, Surtitre, Tabs } from '../components/ui';
+import { ActionMenu, Avatar, AvatarStack, Badge, Button, Card, Empty, Modal, Progress, Select, Surtitre } from '../components/ui';
 import { isAssigned } from '../lib/assignees';
 
-type View = 'roadmap' | 'tableau' | 'liste';
+type View = 'liste' | 'tableau' | 'chronologie' | 'calendrier' | 'bord';
+const VIEWS: { id: View; label: string }[] = [
+  { id: 'liste', label: 'Liste' }, { id: 'tableau', label: 'Tableau' }, { id: 'chronologie', label: 'Chronologie' },
+  { id: 'calendrier', label: 'Calendrier' }, { id: 'bord', label: 'Tableau de bord' },
+];
+const initialView = (): View => {
+  try { const v = localStorage.getItem('mahq_vue_projet'); if (VIEWS.some((x) => x.id === v)) return v as View; } catch { /* ignoré */ }
+  return 'liste';
+};
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
   const nav = useNavigate();
   const { snap, me, byId, loaded, deleteProject, saveProject } = useStore();
-  const [view, setView] = useState<View>(() => (localStorage.getItem('mahq_vue_projet') as View) || 'roadmap');
+  const [view, setView] = useState<View>(initialView);
   const [draft, setDraft] = useState<TaskDraft | null>(null);
   const [editing, setEditing] = useState(false);
   const [dup, setDup] = useState(false);
@@ -50,11 +58,12 @@ export default function ProjectDetail() {
   const h = projectHealth(project, snap.tasks);
   const left = project.end_date ? daysUntil(project.end_date) : null;
   const filtered = sortTasks(tasks.filter((t) => (!person || isAssigned(t, person)) && (!hideDone || !isDone(t))));
-  const phases = [...project.phases, ...(tasks.some((t) => !t.phase || !project.phases.includes(t.phase)) ? ['Sans étape'] : [])];
-  const phaseOf = (t: Task) => (t.phase && project.phases.includes(t.phase) ? t.phase : 'Sans étape');
+  const phases = [...project.phases, ...(tasks.some((t) => !t.phase || !project.phases.includes(t.phase)) ? [NO_PHASE] : [])];
+  const phaseOf = (t: Task) => (t.phase && project.phases.includes(t.phase) ? t.phase : NO_PHASE);
   const activity = snap.activity.filter((a) => a.project_id === project.id).sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 10);
 
   const newTask = (extra: TaskDraft = {}) => setDraft({ project_id: project.id, ...extra });
+  const viewProps = { project, tasks: filtered, phases, phaseOf, onEdit: (t: Task) => setDraft(t), onNew: (extra: Partial<Task>) => newTask(extra), canEdit: member };
 
   return (
     <>
@@ -93,10 +102,17 @@ export default function ProjectDetail() {
         </div>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+      <div className={view === 'liste' ? 'grid gap-6 xl:grid-cols-[1fr_360px]' : 'grid gap-6'}>
         <div className="min-w-0">
+          <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <div className="flex w-max gap-1 border-b border-mab-filet" role="tablist" aria-label="Vues du projet">
+              {VIEWS.map((v) => (
+                <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => setView(v.id)}
+                  className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${view === v.id ? 'border-mab-aqua text-mab-encre' : 'border-transparent text-mab-texte hover:text-mab-encre'}`}>{v.label}</button>
+              ))}
+            </div>
+          </div>
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <Tabs value={view} onChange={setView} items={[{ id: 'roadmap', label: 'Roadmap' }, { id: 'tableau', label: 'Tableau' }, { id: 'liste', label: 'Liste' }]} />
             <select value={person} onChange={(e) => setPerson(e.target.value)} className="h-10 rounded-mab-pilule border border-mab-filet bg-white px-4 text-sm">
               <option value="">Tout le monde</option>
               {project.member_ids.map((x) => byId.get(x)).filter(Boolean).map((p) => <option key={p!.id} value={p!.id}>{p!.full_name}</option>)}
@@ -105,40 +121,22 @@ export default function ProjectDetail() {
             {member && <Button variant="primaire" className="max-sm:w-full sm:ml-auto" onClick={() => newTask()}><Plus size={17} /> Ajouter une tâche</Button>}
           </div>
 
-          {view === 'roadmap' && (
+          {view === 'liste' && (
             <>
               <PhaseStepper phases={phases} tasks={tasks} phaseOf={phaseOf} />
-              <div className="grid gap-4">
-                {phases.map((ph, i) => {
-                  const list = filtered.filter((t) => phaseOf(t) === ph);
-                  const all = tasks.filter((t) => phaseOf(t) === ph);
-                  if (ph === 'Sans étape' && !all.length) return null;
-                  return (
-                    <Card key={ph} id={`etape-${i}`} className="scroll-mt-24 p-5">
-                      <PhaseHeader project={project} phase={ph} index={i} done={all.filter(isDone).length} total={all.length} editable={admin && ph !== 'Sans étape'} onDelete={() => setDeleting(ph)} />
-                      {list.map((t) => <TaskRow key={t.id} task={t} onEdit={setDraft} />)}
-                      {list.length === 0 && <p className="py-2 text-sm text-mab-gris-doux">Aucune tâche{person || hideDone ? ' avec ces filtres' : ''}.</p>}
-                      {member && ph !== 'Sans étape' && (
-                        <button onClick={() => newTask({ phase: ph })} className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-mab-aqua-texte hover:underline"><Plus size={15} /> Ajouter dans cette étape</button>
-                      )}
-                    </Card>
-                  );
-                })}
-                {admin && <AddPhase project={project} />}
-              </div>
+              <ListView {...viewProps} header={(ph, i, all) => (
+                <PhaseHeader project={project} phase={ph} index={i} done={all.filter(isDone).length} total={all.length} editable={admin && ph !== NO_PHASE} onDelete={() => setDeleting(ph)} />
+              )} />
+              {admin && <div className="mt-4"><AddPhase project={project} /></div>}
             </>
           )}
-
-          {view === 'tableau' && <Kanban tasks={filtered} onEdit={setDraft} canEdit={member} />}
-
-          {view === 'liste' && (
-            <Card className="px-5 py-2">
-              {filtered.length === 0 ? <p className="py-6 text-center text-sm text-mab-texte">Aucune tâche.</p> : filtered.map((t) => <TaskRow key={t.id} task={t} onEdit={setDraft} />)}
-            </Card>
-          )}
+          {view === 'tableau' && <BoardView {...viewProps} />}
+          {view === 'chronologie' && <TimelineView {...viewProps} />}
+          {view === 'calendrier' && <CalendarView {...viewProps} />}
+          {view === 'bord' && <DashboardView {...viewProps} tasks={tasks} />}
         </div>
 
-        <div className="grid content-start gap-6">
+        <div className={view === 'liste' ? 'grid content-start gap-6' : 'grid content-start gap-6 lg:grid-cols-2'}>
           <Card className="p-5">
             <Surtitre>Discussion</Surtitre>
             <h2 className="mb-4 mt-1 text-lg font-semibold">Échanges de l’équipe</h2>
@@ -184,71 +182,6 @@ function PhaseStepper({ phases, tasks, phaseOf }: { phases: string[]; tasks: Tas
             <p className="truncate text-xs font-semibold text-mab-encre" title={ph}>{ph.replace(/^\d+\s*·\s*/, '')}</p>
             <p className={`mt-0.5 text-xs ${late && !complete ? 'text-mab-erreur' : 'text-mab-texte'}`}>{complete ? 'Terminé' : `${done} / ${all.length}${late ? ' · retard' : ''}`}</p>
           </button>
-        );
-      })}
-    </div>
-  );
-}
-
-const COLS: { id: TaskStatus; label: string }[] = [
-  { id: 'a_faire', label: 'À faire' },
-  { id: 'en_cours', label: 'En cours' },
-  { id: 'fait', label: 'Fait' },
-];
-
-function Kanban({ tasks, onEdit, canEdit }: { tasks: Task[]; onEdit: (t: Task) => void; canEdit: boolean }) {
-  const { setTaskStatus } = useStore();
-  const [over, setOver] = useState<TaskStatus | null>(null);
-  return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {COLS.map((c) => {
-        const list = tasks.filter((t) => t.status === c.id);
-        return (
-          <div
-            key={c.id}
-            onDragOver={(e) => { if (canEdit) { e.preventDefault(); setOver(c.id); } }}
-            onDragLeave={() => setOver(null)}
-            onDrop={(e) => {
-              setOver(null);
-              const t = tasks.find((x) => x.id === e.dataTransfer.getData('text/plain'));
-              if (t && t.status !== c.id) setTaskStatus(t, c.id);
-            }}
-            className={`rounded-mab-carte border p-3 transition ${over === c.id ? 'border-mab-aqua bg-mab-wash-2' : 'border-mab-filet bg-mab-wash'}`}
-          >
-            <p className="mb-3 flex items-center justify-between px-1 text-sm font-semibold">{c.label}<span className="font-normal text-mab-texte">{list.length}</span></p>
-            <div className="grid gap-2">
-              {list.map((t) => (
-                <div
-                  key={t.id}
-                  draggable={canEdit}
-                  onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)}
-                  onClick={() => onEdit(t)}
-                  className="cursor-pointer rounded-mab-champ border border-mab-filet bg-white p-3 transition hover:border-mab-filet-aqua"
-                >
-                  <div className="flex items-start gap-2">
-                    <span onClick={(e) => e.stopPropagation()}><StatusCheck task={t} disabled={!canEdit} /></span>
-                    <p className={`flex-1 text-sm ${isDone(t) ? 'text-mab-gris-doux line-through' : ''}`}>{t.title}</p>
-                  </div>
-                  {canEdit && (
-                    <select
-                      aria-label="Changer le statut"
-                      value={t.status}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => setTaskStatus(t, e.target.value as TaskStatus)}
-                      className="mt-2 h-9 w-full rounded-mab-champ border border-mab-filet bg-mab-wash px-2 text-sm [@media(hover:hover)]:hidden"
-                    >
-                      {COLS.map((c2) => <option key={c2.id} value={c2.id}>{c2.label}</option>)}
-                    </select>
-                  )}
-                  <div className="mt-2 flex items-center justify-between text-xs text-mab-texte">
-                    <span className="flex items-center gap-2.5"><span className={isLate(t) ? 'font-semibold text-mab-erreur' : ''}>{fmtShort(t.due_date)}</span><TaskMeta task={t} /></span>
-                    <AssigneeStack task={t} size={22} />
-                  </div>
-                </div>
-              ))}
-              {list.length === 0 && <p className="px-1 py-4 text-center text-xs text-mab-gris-doux">{canEdit ? 'Glisse une tâche ici' : '—'}</p>}
-            </div>
-          </div>
         );
       })}
     </div>

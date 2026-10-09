@@ -42,6 +42,7 @@ export function ChecklistEditor({ items, onChange, disabled }: { items: Checklis
             onDragOver={(e) => { e.preventDefault(); if (drag !== null && drag !== i) { move(drag, i); setDrag(i); } }}
             onDragEnd={() => setDrag(null)}
             className={`group flex items-center gap-2 rounded-mab-etiquette px-1 py-1 ${drag === i ? 'bg-mab-wash-2' : 'hover:bg-mab-wash'}`}
+            style={it.level ? { marginLeft: it.level * 22 } : undefined}
           >
             {!disabled && <GripVertical size={14} className="shrink-0 cursor-grab text-mab-gris-doux hover-reveal opacity-0 group-hover:opacity-100" />}
             <input
@@ -56,7 +57,15 @@ export function ChecklistEditor({ items, onChange, disabled }: { items: Checklis
               defaultValue={it.text}
               disabled={disabled}
               onBlur={(e) => e.target.value.trim() && e.target.value !== it.text && onChange(items.map((x) => (x.id === it.id ? { ...x, text: e.target.value.trim() } : x)))}
-              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                // Tab / Maj+Tab : décaler la sous-tâche d'un niveau (jusqu'à 2), comme dans Asana.
+                if (e.key === 'Tab' && !disabled) {
+                  const level = Math.max(0, Math.min(2, (it.level ?? 0) + (e.shiftKey ? -1 : 1)));
+                  if (level !== (it.level ?? 0)) { e.preventDefault(); onChange(items.map((x) => (x.id === it.id ? { ...x, level } : x))); }
+                }
+              }}
+              title={disabled ? undefined : 'Tab pour décaler à droite, Maj+Tab pour revenir'}
               className={`min-w-0 flex-1 bg-transparent text-[15px] outline-none ${it.done ? 'text-mab-gris-doux line-through' : 'text-mab-encre'}`}
             />
             {!disabled && (

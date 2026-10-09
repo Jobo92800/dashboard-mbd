@@ -141,6 +141,7 @@ export function TaskSheet({ task, onEdit, onClose }: { task: Task; onEdit: () =>
               <>
                 <span className={`block font-medium ${late ? 'text-mab-erreur' : ''}`}>{relativeLabel(task.due_date)}</span>
                 <span className="block text-xs capitalize text-mab-texte">{fmtLong(task.due_date)}</span>
+                {task.start_date && task.start_date !== task.due_date && <span className="block text-xs text-mab-texte">début le {fmtLong(task.start_date)}</span>}
               </>
             ) : <span className="text-mab-gris-doux">Sans échéance</span>}
           </Info>

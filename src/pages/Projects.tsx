@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { addDays, differenceInCalendarDays, parseISO, startOfWeek, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CalendarRange, FolderPlus, LayoutGrid, LayoutTemplate } from 'lucide-react';
+import { CalendarRange, FileUp, FolderPlus, LayoutGrid, LayoutTemplate } from 'lucide-react';
 import { useStore } from '../state/store';
 import type { Project, ProjectStatus, ProjectTemplate } from '../lib/types';
 import { TemplatesModal } from '../components/TemplateModals';
@@ -10,6 +10,7 @@ import { daysUntil, fmtShort, todayIso } from '../lib/dates';
 import { isDone, isLate, progress, projectHealth } from '../lib/selectors';
 import { isAdmin } from '../lib/permissions';
 import { ProjectModal } from '../components/ProjectModal';
+import { ImportAsanaModal } from '../components/ImportAsanaModal';
 import { AvatarStack, Avatar, Badge, Button, Card, Empty, PageTitle, Progress, Stat, Tabs } from '../components/ui';
 import { isAssigned } from '../lib/assignees';
 
@@ -23,6 +24,7 @@ export default function Projects() {
   const [person, setPerson] = useState<string>('');
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [useTpl, setUseTpl] = useState<ProjectTemplate | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const counts = (s: ProjectStatus) => snap.projects.filter((p) => p.status === s).length;
   const list = snap.projects
@@ -38,6 +40,7 @@ export default function Projects() {
     <>
       <PageTitle title={<>Projets <b>en cours</b></>} sub="Piloter les missions et savoir qui fait quoi.">
         {isAdmin(me) && <Button onClick={() => setTemplatesOpen(true)}><LayoutTemplate size={16} /> Modèles{snap.templates.length ? ` · ${snap.templates.length}` : ''}</Button>}
+        {isAdmin(me) && <Button onClick={() => setImporting(true)}><FileUp size={16} /> Importer d’Asana</Button>}
         {isAdmin(me) && <Button variant="primaire" onClick={() => { setUseTpl(null); setCreating(true); }}><FolderPlus size={17} /> Créer un projet</Button>}
       </PageTitle>
 
@@ -78,6 +81,7 @@ export default function Projects() {
       {tab === 'en_cours' && <WhoDoesWhat />}
 
       <ProjectModal open={creating} initialTemplate={useTpl} onClose={() => setCreating(false)} />
+      <ImportAsanaModal open={importing} onClose={() => setImporting(false)} />
       <TemplatesModal open={templatesOpen} onClose={() => setTemplatesOpen(false)} onUse={(t) => { setUseTpl(t); setCreating(true); }} />
     </>
   );

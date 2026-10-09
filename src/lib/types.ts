@@ -47,7 +47,8 @@ export const RECURRENCES: { id: Recurrence; label: string }[] = [
   { id: 'mensuelle', label: 'Tous les mois' },
 ];
 
-export interface ChecklistItem { id: string; text: string; done: boolean }
+/** Sous-tâche ; `level` 1 ou 2 = sous-sous-tâche (indentée), comme dans Asana. */
+export interface ChecklistItem { id: string; text: string; done: boolean; level?: number }
 
 /** Lien (Canva, Drive…) ou fichier déposé. `path` = emplacement dans le stockage pour un fichier. */
 export type Bucket = 'pieces-jointes' | 'messagerie' | 'documents';
@@ -62,6 +63,7 @@ export interface Task {
   note: string;
   assignee_id: string | null; // première personne (compatibilité)
   assignee_ids: string[]; // toutes les personnes concernées : une seule tâche partagée
+  start_date?: string | null; // début (vue Chronologie) ; absent sur les anciennes tâches
   due_date: string | null;
   priority: Priority;
   status: TaskStatus;

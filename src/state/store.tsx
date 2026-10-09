@@ -162,12 +162,14 @@ function useStoreValue() {
       start_date: shiftIso(refDate, tpl.start_offset), end_date: shiftIso(refDate, tpl.end_offset),
       status: 'en_cours', phases: [...tpl.phases], member_ids: memberIds, created_by: me!.id, created_at: now(),
     };
-    const tasks: Task[] = tpl.tasks.map((tt) => ({
+    const base = Date.now();
+    const tasks: Task[] = tpl.tasks.map((tt, i) => ({
       id: uid(), project_id: project.id, phase: tt.phase, title: tt.title, note: tt.note,
       ...withAssignees(keepAssignees && tt.assignee_id && memberIds.includes(tt.assignee_id) ? [tt.assignee_id] : []),
       due_date: tt.offset_days === null ? null : shiftIso(refDate, tt.offset_days),
-      priority: tt.priority, status: 'a_faire', kind: null, centre: null, created_by: me!.id, created_at: now(), done_at: null,
-      checklist: tt.checklist.map((text) => ({ id: uid(), text, done: false })), attachments: [], recurrence: null,
+      priority: tt.priority, status: 'a_faire', kind: null, centre: null, created_by: me!.id, created_at: new Date(base + i).toISOString(), done_at: null,
+      // Dans un modèle, le niveau d'une sous-tâche est noté par des tabulations en tête.
+      checklist: tt.checklist.map((text) => { const level = /^\t*/.exec(text)![0].length; return { id: uid(), text: text.slice(level), done: false, ...(level ? { level } : {}) }; }), attachments: [], recurrence: null,
     }));
     await run(
       (st) => ({ ...st, projects: [project, ...st.projects], tasks: [...tasks, ...st.tasks] }),
@@ -189,9 +191,9 @@ function useStoreValue() {
       id: uid(), name, description: p.description, reference_label: label,
       start_offset: off(p.start_date) ?? 0, end_offset: off(p.end_date) ?? 0,
       phases: [...p.phases], member_ids: [...p.member_ids],
-      tasks: snap.tasks.filter((t) => t.project_id === p.id).map((t) => ({
+      tasks: snap.tasks.filter((t) => t.project_id === p.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).map((t) => ({
         title: t.title, phase: t.phase, offset_days: off(t.due_date), priority: t.priority,
-        assignee_id: keepAssignees ? assigneesOf(t)[0] ?? null : null, note: t.note, checklist: t.checklist.map((c) => c.text),
+        assignee_id: keepAssignees ? assigneesOf(t)[0] ?? null : null, note: t.note, checklist: t.checklist.map((c) => '\t'.repeat(c.level ?? 0) + c.text),
       })),
       created_by: me!.id, created_at: now(),
     };
@@ -405,6 +407,27 @@ function useStoreValue() {
 
     createFromTemplate(tpl: ProjectTemplate, opts: { name: string; refDate: string; memberIds: string[]; keepAssignees: boolean }) {
       return instantiate(tpl, opts.name, opts.refDate, opts.memberIds, opts.keepAssignees);
+    },
+
+    /** Crée un projet complet (étapes, tâches, sous-tâches) importé d'Asana. */
+    async importProject(p: Pick<Project, 'name' | 'description' | 'start_date' | 'end_date' | 'phases' | 'member_ids'>, list: Omit<Task, 'id' | 'project_id' | 'created_by' | 'created_at'>[]) {
+      const project: Project = {
+        id: uid(), ...p, color: nextColorFor(snap.projects.map((x) => x.color)), status: 'en_cours', created_by: me!.id, created_at: now(),
+      };
+      // Horodatages espacés d'1 ms pour garder l'ordre d'Asana.
+      const base = Date.now();
+      const tasks: Task[] = list.map((t, i) => ({ ...t, id: uid(), project_id: project.id, created_by: me!.id, created_at: new Date(base + i).toISOString() }));
+      await run(
+        (st) => ({ ...st, projects: [project, ...st.projects], tasks: [...tasks, ...st.tasks] }),
+        async () => {
+          await backend.insert('projects', project);
+          await backend.insertMany('tasks', tasks);
+          await log(`a importé le projet « ${project.name} » depuis Asana (${tasks.length} tâches)`, project.id);
+          await notify(project.member_ids.filter((x) => x !== me!.id), `${firstName(me!.id)} t’a ajouté(e) au projet « ${project.name} »`, `/projets/${project.id}`, 'projet');
+        },
+        `Projet importé : ${tasks.length} tâches`,
+      );
+      return project.id;
     },
 
     /** Copie d'un projet décalée à une nouvelle date de début. */

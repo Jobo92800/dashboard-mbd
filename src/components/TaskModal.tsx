@@ -143,8 +143,13 @@ export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose
           )}
           <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 sm:gap-x-4">
 
+            {t.project_id && (
+              <Field label="Début" help="Pour la chronologie du projet">
+                <Input type="date" value={t.start_date ?? ''} max={t.due_date ?? undefined} onChange={(e) => set({ start_date: e.target.value || null })} />
+              </Field>
+            )}
             <Field label="Échéance">
-              <Input type="date" value={t.due_date ?? ''} onChange={(e) => set({ due_date: e.target.value || null })} />
+              <Input type="date" value={t.due_date ?? ''} min={t.start_date ?? undefined} onChange={(e) => set({ due_date: e.target.value || null })} />
             </Field>
             <Field label="Répétition" help={t.recurrence ? 'La suivante se crée quand celle-ci est faite.' : undefined}>
               <Select value={t.recurrence ?? ''} onChange={(e) => set({ recurrence: (e.target.value || null) as Recurrence | null })}>

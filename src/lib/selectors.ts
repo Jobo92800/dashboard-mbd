@@ -32,6 +32,8 @@ export function sortTasks(list: Task[]) {
     if (isDone(a) !== isDone(b)) return isDone(a) ? 1 : -1;
     const da = a.due_date ?? '9999', db = b.due_date ?? '9999';
     if (da !== db) return da < db ? -1 : 1;
-    return PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
+    if (a.priority !== b.priority) return PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
+    // À égalité, l'ordre de création (celui du modèle ou de l'import) : la base ne garantit pas l'ordre.
+    return a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0;
   });
 }
