@@ -11,12 +11,13 @@ import { isDone } from '../lib/selectors';
 import { ActionMenu, Avatar, Badge, Button, IconButton, Input, Modal, Textarea } from './ui';
 import { PresenceDot } from './Presence';
 import { fmtDur } from './EventModal';
+import { QuickPeople } from './QuickPeople';
 
 /** Carte d'un rendez-vous : infos, bouton visio, compte rendu et décisions. */
 export function EventSheet({ event, onClose, onEdit, onOpenTask }: {
   event: CalEvent; onClose: () => void; onEdit: () => void; onOpenTask: (taskId: string) => void;
 }) {
-  const { snap, me, byId, saveMinutes, shareMinutes, deleteEvent } = useStore();
+  const { snap, me, byId, saveMinutes, shareMinutes, deleteEvent, saveEvent } = useStore();
   const [notes, setNotes] = useState(event.minutes);
   const [editingNotes, setEditingNotes] = useState(false);
   const [newDecision, setNewDecision] = useState('');
@@ -83,6 +84,10 @@ export function EventSheet({ event, onClose, onEdit, onOpenTask }: {
                 {p.id === me!.id ? 'Moi' : p.full_name.split(' ')[0]}{p.id === event.created_by && <span className="text-[10px] text-mab-gris-doux">organisateur</span>}
               </span>
             ))}
+            {organizer && (
+              <QuickPeople people={snap.profiles.filter((p) => p.active && p.id !== event.created_by)} value={event.participant_ids}
+                onToggle={(id) => saveEvent({ ...event, participant_ids: event.participant_ids.includes(id) ? event.participant_ids.filter((x) => x !== id) : [...event.participant_ids, id] })} />
+            )}
           </div>
         </div>
 

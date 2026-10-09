@@ -3,7 +3,7 @@ import { CalendarDays, Check, Flag, Layers, ListChecks, MessageSquareText, Paper
 import type { Task, TaskStatus } from '../lib/types';
 import { RECURRENCES } from '../lib/types';
 import { useStore } from '../state/store';
-import { canDeleteTask, canEditTask } from '../lib/permissions';
+import { canDeleteTask, canEditTask, isAdmin } from '../lib/permissions';
 import { fmtLong, fmtStamp, relativeLabel } from '../lib/dates';
 import { isDone, isLate } from '../lib/selectors';
 import { absenceWarning } from '../lib/absences';
@@ -11,6 +11,7 @@ import { Markdown } from '../lib/markdown';
 import { ActionMenu, Avatar, Badge, Button, Modal } from './ui';
 import { Attachments, ChecklistEditor } from './TaskExtras';
 import { Discussion } from './Comments';
+import { QuickPeople } from './QuickPeople';
 import { PresenceDot, usePresenceText } from './Presence';
 import { assigneesOf } from '../lib/assignees';
 
@@ -43,7 +44,7 @@ function Block({ icon, title, children }: { icon: React.ReactNode; title: string
 
 /** Carte de lecture d'une tâche : tout voir d'un coup d'œil, cocher, commenter ; « Modifier » ouvre le formulaire. */
 export function TaskSheet({ task, onEdit, onClose }: { task: Task; onEdit: () => void; onClose: () => void }) {
-  const { snap, me, byId, setTaskStatus, setChecklist, addTaskComment, deleteTaskComment, deleteTask } = useStore();
+  const { snap, me, byId, setTaskStatus, setChecklist, addTaskComment, deleteTaskComment, deleteTask, saveTask, saveProject } = useStore();
   const presenceText = usePresenceText();
   const project = snap.projects.find((p) => p.id === task.project_id);
   const people = assigneesOf(task).map((id) => byId.get(id)).filter(Boolean) as NonNullable<ReturnType<typeof byId.get>>[];
@@ -55,6 +56,14 @@ export function TaskSheet({ task, onEdit, onClose }: { task: Task; onEdit: () =>
   const comments = snap.task_comments.filter((c) => c.task_id === task.id);
   const commenters = snap.profiles.filter((p) => p.active && (!project || project.member_ids.includes(p.id) || p.role === 'admin'));
   const checklistDone = task.checklist.filter((c) => c.done).length;
+  // Ajout / retrait direct d'une personne ; quelqu'un d'extérieur au projet y est ajouté.
+  const pickable = snap.profiles.filter((p) => p.active && (!project || isAdmin(me) || project.member_ids.includes(p.id)));
+  const togglePerson = async (id: string) => {
+    const ids = assigneesOf(task);
+    const next = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
+    if (project && !project.member_ids.includes(id) && next.includes(id)) await saveProject({ ...project, member_ids: [...project.member_ids, id] });
+    await saveTask({ id: task.id, title: task.title, assignee_ids: next });
+  };
 
   return (
     <Modal
@@ -135,6 +144,12 @@ export function TaskSheet({ task, onEdit, onClose }: { task: Task; onEdit: () =>
                 ))}
               </span>
             ) : <span className="text-mab-gris-doux">Personne</span>}
+            {editable && (
+              <div className="mt-2">
+                <QuickPeople people={pickable} value={assigneesOf(task)} onToggle={togglePerson} label={people.length ? 'Ajouter / retirer' : 'Ajouter quelqu’un'}
+                  note={(p) => (project && !project.member_ids.includes(p.id) ? 'hors projet · sera ajouté(e)' : null)} />
+              </div>
+            )}
           </Info>
           <Info icon={<CalendarDays size={17} />} label="Échéance">
             {task.due_date ? (
@@ -144,6 +159,11 @@ export function TaskSheet({ task, onEdit, onClose }: { task: Task; onEdit: () =>
                 {task.start_date && task.start_date !== task.due_date && <span className="block text-xs text-mab-texte">début le {fmtLong(task.start_date)}</span>}
               </>
             ) : <span className="text-mab-gris-doux">Sans échéance</span>}
+            {editable && (
+              <input type="date" aria-label="Changer l’échéance" value={task.due_date ?? ''} min={task.start_date ?? undefined}
+                onChange={(e) => saveTask({ id: task.id, title: task.title, due_date: e.target.value || null })}
+                className="mt-2 h-8 rounded-mab-etiquette border border-mab-filet bg-white px-2 text-[16px] text-mab-encre sm:text-sm" />
+            )}
           </Info>
           {project && (
             <Info icon={<Layers size={17} />} label="Étape">
