@@ -76,7 +76,7 @@ export function ListView({ tasks, phases, phaseOf, onEdit, onNew, canEdit, heade
                           <span className="hidden md:block"><AssigneeStack task={t} size={24} /></span>
                           <span className={`text-sm ${isLate(t) ? 'font-semibold text-mab-erreur' : 'text-mab-texte'}`}>{t.start_date && t.due_date && t.start_date !== t.due_date ? `${fmtShort(t.start_date)} – ${fmtShort(t.due_date)}` : fmtShort(t.due_date)}</span>
                           <span className="hidden md:block"><Badge tone={PRIO_TONE[t.priority]}>{t.priority}</Badge></span>
-                          <span className="hidden md:block"><Badge tone={STATUS.find((s) => s.id === t.status)!.tone}>{STATUS.find((s) => s.id === t.status)!.label}</Badge></span>
+                          <span className="hidden md:block">{t.validated_at ? <Badge tone="succes">Validée</Badge> : <Badge tone={STATUS.find((s) => s.id === t.status)!.tone}>{STATUS.find((s) => s.id === t.status)!.label}</Badge>}</span>
                         </div>
                       </div>
                       {expanded && <SubtaskList task={t} canEdit={canEdit} />}

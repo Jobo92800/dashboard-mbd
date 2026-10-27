@@ -123,6 +123,28 @@ export function ProjectModal({ project, open, onClose, initialTemplate }: { proj
         <Field label="Personnes sur le projet">
           <PeoplePicker people={snap.profiles.filter((x) => x.active)} value={p.member_ids ?? []} onChange={(ids) => set({ member_ids: ids })} />
         </Field>
+        <div className="rounded-mab-champ border border-mab-filet p-4">
+          <label className="flex items-start gap-2.5 text-sm">
+            <input type="checkbox" className="mt-0.5 accent-mab-aqua" checked={!!p.validation_mode} onChange={(e) => set({ validation_mode: e.target.checked })} />
+            <span><b>Pilotage par missions</b><span className="block text-mab-texte">Livrables à valider, progression officielle, onglets Aperçu, Suivi et Décisions.</span></span>
+          </label>
+          {p.validation_mode && (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="Coordination" help="Reçoit les points d’avancement">
+                <Select value={p.coordinator_id ?? ''} onChange={(e) => set({ coordinator_id: e.target.value || null })}>
+                  <option value="">Personne</option>
+                  {snap.profiles.filter((x) => x.active).map((x) => <option key={x.id} value={x.id}>{x.full_name}</option>)}
+                </Select>
+              </Field>
+              <Field label="Décisions" help="Reçoit les demandes à trancher">
+                <Select value={p.decider_id ?? ''} onChange={(e) => set({ decider_id: e.target.value || null })}>
+                  <option value="">Personne</option>
+                  {snap.profiles.filter((x) => x.active).map((x) => <option key={x.id} value={x.id}>{x.full_name}</option>)}
+                </Select>
+              </Field>
+            </div>
+          )}
+        </div>
         <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
           {!project && (
             <Field label="Modèle d’étapes">

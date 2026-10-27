@@ -36,6 +36,10 @@ export interface Project {
   member_ids: string[];
   created_by: string | null;
   created_at: string;
+  // Pilotage façon « roadmap » : progression officielle = livrables validés ; coordination et décisions.
+  validation_mode?: boolean;
+  coordinator_id?: string | null;
+  decider_id?: string | null;
 }
 
 export type Recurrence = 'quotidienne' | 'jours_ouvres' | 'hebdomadaire' | 'bimensuelle' | 'mensuelle';
@@ -64,6 +68,13 @@ export interface Task {
   assignee_id: string | null; // première personne (compatibilité)
   assignee_ids: string[]; // toutes les personnes concernées : une seule tâche partagée
   start_date?: string | null; // début (vue Chronologie) ; absent sur les anciennes tâches
+  // Pilotage des missions (projets en « validation_mode ») ; absents sur les anciennes tâches.
+  depends_on?: string[]; // missions dont celle-ci dépend
+  launch_order?: LaunchOrder | null;
+  deliverable?: string; // livrable attendu
+  deliverable_version?: string; // version actuelle du livrable (ex. V0.1)
+  validated_by?: string | null; // validation explicite du livrable
+  validated_at?: string | null;
   due_date: string | null;
   priority: Priority;
   status: TaskStatus;
@@ -75,6 +86,61 @@ export interface Task {
   checklist: ChecklistItem[];
   attachments: Attachment[];
   recurrence: Recurrence | null;
+}
+
+export type LaunchOrder = 'maintenant' | 'ensuite' | 'plus_tard';
+export const LAUNCH_ORDERS: { id: LaunchOrder; label: string }[] = [
+  { id: 'maintenant', label: 'Maintenant' }, { id: 'ensuite', label: 'Ensuite' }, { id: 'plus_tard', label: 'Plus tard' },
+];
+
+/** Point d'avancement d'une mission (ce qui était « à reporter dans T0.A »). */
+export type UpdateState = 'a_lancer' | 'en_cours' | 'bloquee' | 'en_validation' | 'terminee';
+export const UPDATE_STATES: { id: UpdateState; label: string; tone: 'neutre' | 'violet' | 'erreur' | 'factuel' | 'succes' }[] = [
+  { id: 'a_lancer', label: 'À lancer', tone: 'neutre' },
+  { id: 'en_cours', label: 'En cours', tone: 'violet' },
+  { id: 'bloquee', label: 'Bloquée', tone: 'erreur' },
+  { id: 'en_validation', label: 'En attente de validation', tone: 'factuel' },
+  { id: 'terminee', label: 'Terminée', tone: 'succes' },
+];
+export interface TaskUpdate {
+  id: string;
+  task_id: string;
+  author_id: string;
+  state: UpdateState;
+  version: string;
+  done_text: string;
+  blockers: string;
+  arbitrages: string;
+  next_action: string;
+  created_at: string;
+}
+
+/** Journal des décisions d'un projet (ce qui était « T0.B »). */
+export type DecisionKind = 'a_decider' | 'decision' | 'proposition' | 'hypothese' | 'a_confirmer' | 'fait' | 'rejete';
+export const DECISION_KINDS: { id: DecisionKind; label: string; help: string; tone: 'emotion' | 'succes' | 'violet' | 'factuel' | 'neutre' | 'mesure' | 'erreur' }[] = [
+  { id: 'a_decider', label: 'À décider', help: 'Un choix à trancher par la direction', tone: 'emotion' },
+  { id: 'decision', label: 'Décision', help: 'Choix officiellement validé', tone: 'succes' },
+  { id: 'proposition', label: 'Proposition', help: 'Idée à étudier, pas encore validée', tone: 'violet' },
+  { id: 'hypothese', label: 'Hypothèse', help: 'Scénario ou chiffre de travail, non confirmé', tone: 'factuel' },
+  { id: 'a_confirmer', label: 'À confirmer', help: 'Information à vérifier par la bonne personne', tone: 'mesure' },
+  { id: 'fait', label: 'Fait', help: 'Information réelle et vérifiée', tone: 'neutre' },
+  { id: 'rejete', label: 'Écartée', help: 'Option examinée puis écartée', tone: 'erreur' },
+];
+export interface DecisionEntry {
+  id: string;
+  project_id: string;
+  task_id: string | null;
+  kind: DecisionKind;
+  title: string;
+  context: string;
+  options: string;
+  decision: string;
+  consequences: string;
+  changes_roadmap: boolean;
+  author_id: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string;
 }
 
 export interface TaskComment {
@@ -324,6 +390,8 @@ export interface Snapshot {
   messages: Message[];
   reads: ReadMark[];
   task_comments: TaskComment[];
+  task_updates: TaskUpdate[];
+  decisions_log: DecisionEntry[];
   templates: ProjectTemplate[];
   reactions: Reaction[];
   announcements: Announcement[];

@@ -55,6 +55,8 @@ export function visibleFor(me: Profile, s: Snapshot): Snapshot {
     projects,
     tasks: visibleTasks,
     task_comments: s.task_comments.filter((c) => taskIds.has(c.task_id)),
+    task_updates: s.task_updates.filter((c) => taskIds.has(c.task_id)),
+    decisions_log: s.decisions_log.filter((d) => ids.has(d.project_id)),
     templates: s.templates,
     announcements: s.announcements,
     announcement_reads: s.announcement_reads,

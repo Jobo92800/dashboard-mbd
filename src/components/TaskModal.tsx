@@ -27,7 +27,7 @@ function Section({ icon, title, children, aside }: { icon: React.ReactNode; titl
 }
 
 /** Fiche complète d'une tâche (de projet ou rapide) : infos, sous-tâches, pièces jointes, commentaires. */
-export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose: () => void }) {
+export function TaskModal({ draft, onClose, onOpen }: { draft: TaskDraft | null; onClose: () => void; onOpen?: (t: Task) => void }) {
   const { snap, me, byId, saveTask, saveProject, deleteTask, setChecklist, addTaskComment, deleteTaskComment } = useStore();
   const toast = useToast();
   const [t, setT] = useState<TaskDraft>({});
@@ -78,7 +78,7 @@ export function TaskModal({ draft, onClose }: { draft: TaskDraft | null; onClose
   };
 
   if (mode === 'view' && live) {
-    return <TaskSheet task={live} onClose={onClose} onEdit={() => { setT({ ...live }); setMode('edit'); }} />;
+    return <TaskSheet task={live} onClose={onClose} onOpenTask={onOpen} onEdit={() => { setT({ ...live }); setMode('edit'); }} />;
   }
 
   const checklist = live ? live.checklist : t.checklist ?? [];

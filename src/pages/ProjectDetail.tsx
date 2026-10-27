@@ -3,7 +3,9 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Archive, ArrowDown, ArrowLeft, ArrowUp, CheckCheck, Copy, LayoutTemplate, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../state/store';
 import type { Project, Task } from '../lib/types';
+import { LAUNCH_ORDERS } from '../lib/types';
 import { BoardView, CalendarView, DashboardView, ListView, NO_PHASE, TimelineView } from '../components/ProjectViews';
+import { DecisionsView, FollowView, OfficialProgress, OverviewView } from '../components/ProjectPilotage';
 import { daysUntil, fmtShort, fmtStamp } from '../lib/dates';
 import { isDone, isLate, progress, projectHealth, sortTasks } from '../lib/selectors';
 import { isAdmin, isProjectMember } from '../lib/permissions';
@@ -14,13 +16,17 @@ import { Comments } from '../components/Comments';
 import { ActionMenu, Avatar, AvatarStack, Badge, Button, Card, Empty, Modal, Progress, Select, Surtitre } from '../components/ui';
 import { isAssigned } from '../lib/assignees';
 
-type View = 'liste' | 'tableau' | 'chronologie' | 'calendrier' | 'bord';
+type View = 'apercu' | 'liste' | 'tableau' | 'chronologie' | 'calendrier' | 'bord' | 'suivi' | 'decisions';
 const VIEWS: { id: View; label: string }[] = [
   { id: 'liste', label: 'Liste' }, { id: 'tableau', label: 'Tableau' }, { id: 'chronologie', label: 'Chronologie' },
   { id: 'calendrier', label: 'Calendrier' }, { id: 'bord', label: 'Tableau de bord' },
 ];
+/** Projets pilotés par missions : Aperçu en tête, Suivi (ex-T0.A) et Décisions (ex-T0.B) en plus. */
+const PILOT_VIEWS: { id: View; label: string }[] = [{ id: 'apercu', label: 'Aperçu' }, ...VIEWS.slice(0, 5), { id: 'suivi', label: 'Suivi' }, { id: 'decisions', label: 'Décisions' }];
+/** Première phrase utile d'une description (souvent en Markdown) pour l'en-tête. */
+const summaryOf = (md: string) => (md.split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#')) ?? '').replace(/\*\*|\*|^[-*>]\s*/g, '');
 const initialView = (): View => {
-  try { const v = localStorage.getItem('mahq_vue_projet'); if (VIEWS.some((x) => x.id === v)) return v as View; } catch { /* ignoré */ }
+  try { const v = localStorage.getItem('mahq_vue_projet'); if (PILOT_VIEWS.some((x) => x.id === v)) return v as View; } catch { /* ignoré */ }
   return 'liste';
 };
 
@@ -37,6 +43,7 @@ export default function ProjectDetail() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [person, setPerson] = useState('');
   const [hideDone, setHideDone] = useState(false);
+  const [launch, setLaunch] = useState('');
 
   const project = snap.projects.find((p) => p.id === id);
   const tasks = useMemo(() => snap.tasks.filter((t) => t.project_id === id), [snap.tasks, id]);
@@ -46,6 +53,8 @@ export default function ProjectDetail() {
     const tid = params.get('tache');
     const t = tid && snap.tasks.find((x) => x.id === tid);
     if (t) { setDraft(t); params.delete('tache'); setParams(params, { replace: true }); }
+    const v = params.get('vue') as View | null;
+    if (v && PILOT_VIEWS.some((x) => x.id === v)) { setView(v); params.delete('vue'); setParams(params, { replace: true }); }
   }, [params, snap.tasks, setParams]);
 
   if (!project) {
@@ -53,11 +62,14 @@ export default function ProjectDetail() {
   }
 
   const admin = isAdmin(me);
+  const pilot = !!project.validation_mode;
+  const views = pilot ? PILOT_VIEWS : VIEWS;
+  const current: View = views.some((v) => v.id === view) ? view : 'liste';
   const member = isProjectMember(me!, project);
   const pr = progress(snap.tasks, project.id);
   const h = projectHealth(project, snap.tasks);
   const left = project.end_date ? daysUntil(project.end_date) : null;
-  const filtered = sortTasks(tasks.filter((t) => (!person || isAssigned(t, person)) && (!hideDone || !isDone(t))));
+  const filtered = sortTasks(tasks.filter((t) => (!person || isAssigned(t, person)) && (!hideDone || !isDone(t)) && (!launch || t.launch_order === launch)));
   const phases = [...project.phases, ...(tasks.some((t) => !t.phase || !project.phases.includes(t.phase)) ? [NO_PHASE] : [])];
   const phaseOf = (t: Task) => (t.phase && project.phases.includes(t.phase) ? t.phase : NO_PHASE);
   const activity = snap.activity.filter((a) => a.project_id === project.id).sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 10);
@@ -79,7 +91,7 @@ export default function ProjectDetail() {
               {left !== null && project.status === 'en_cours' && <span className={`text-sm ${left < 0 ? 'font-semibold text-mab-erreur' : 'text-mab-texte'}`}>· {left < 0 ? `dépassé de ${-left} j` : `J-${left}`}</span>}
             </div>
             <h1 className="mt-2 text-[26px] font-light leading-tight tracking-tight text-mab-encre sm:text-[30px]">{project.name}</h1>
-            {project.description && <p className="mt-2 text-[15px] text-mab-texte">{project.description}</p>}
+            {project.description && <p className="mt-2 line-clamp-2 text-[15px] text-mab-texte">{summaryOf(project.description)}</p>}
           </div>
           {admin && (
             <div className="flex flex-wrap items-center gap-2">
@@ -97,31 +109,40 @@ export default function ProjectDetail() {
           )}
         </div>
         <div className="mt-5 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-center">
-          <Progress done={pr.done} total={pr.total} />
+          <div className="grid gap-3">
+            <Progress done={pr.done} total={pr.total} />
+            {pilot && <OfficialProgress tasks={tasks} />}
+          </div>
           <AvatarStack people={project.member_ids.map((x) => byId.get(x))} max={8} />
         </div>
       </Card>
 
-      <div className={view === 'liste' ? 'grid gap-6 xl:grid-cols-[1fr_360px]' : 'grid gap-6'}>
+      <div className={current === 'liste' ? 'grid gap-6 xl:grid-cols-[1fr_360px]' : 'grid gap-6'}>
         <div className="min-w-0">
           <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
             <div className="flex w-max gap-1 border-b border-mab-filet" role="tablist" aria-label="Vues du projet">
-              {VIEWS.map((v) => (
-                <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => setView(v.id)}
-                  className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${view === v.id ? 'border-mab-aqua text-mab-encre' : 'border-transparent text-mab-texte hover:text-mab-encre'}`}>{v.label}</button>
+              {views.map((v) => (
+                <button key={v.id} role="tab" aria-selected={current === v.id} onClick={() => setView(v.id)}
+                  className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${current === v.id ? 'border-mab-aqua text-mab-encre' : 'border-transparent text-mab-texte hover:text-mab-encre'}`}>{v.label}</button>
               ))}
             </div>
           </div>
-          <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className={`mb-4 flex flex-wrap items-center gap-3 ${current === 'decisions' ? 'hidden' : ''}`}>
             <select value={person} onChange={(e) => setPerson(e.target.value)} className="h-10 rounded-mab-pilule border border-mab-filet bg-white px-4 text-sm">
               <option value="">Tout le monde</option>
               {project.member_ids.map((x) => byId.get(x)).filter(Boolean).map((p) => <option key={p!.id} value={p!.id}>{p!.full_name}</option>)}
             </select>
+            {pilot && (
+              <select value={launch} onChange={(e) => setLaunch(e.target.value)} aria-label="Ordre de lancement" className="h-10 rounded-mab-pilule border border-mab-filet bg-white px-4 text-sm">
+                <option value="">Tous les lancements</option>
+                {LAUNCH_ORDERS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+            )}
             <label className="flex items-center gap-2 text-sm text-mab-texte"><input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} className="accent-mab-aqua" /> Masquer les tâches faites</label>
             {member && <Button variant="primaire" className="max-sm:w-full sm:ml-auto" onClick={() => newTask()}><Plus size={17} /> Ajouter une tâche</Button>}
           </div>
 
-          {view === 'liste' && (
+          {current === 'liste' && (
             <>
               <PhaseStepper phases={phases} tasks={tasks} phaseOf={phaseOf} />
               <ListView {...viewProps} header={(ph, i, all) => (
@@ -130,13 +151,16 @@ export default function ProjectDetail() {
               {admin && <div className="mt-4"><AddPhase project={project} /></div>}
             </>
           )}
-          {view === 'tableau' && <BoardView {...viewProps} />}
-          {view === 'chronologie' && <TimelineView {...viewProps} />}
-          {view === 'calendrier' && <CalendarView {...viewProps} />}
-          {view === 'bord' && <DashboardView {...viewProps} tasks={tasks} />}
+          {current === 'tableau' && <BoardView {...viewProps} />}
+          {current === 'chronologie' && <TimelineView {...viewProps} />}
+          {current === 'calendrier' && <CalendarView {...viewProps} />}
+          {current === 'bord' && <DashboardView {...viewProps} tasks={tasks} />}
+          {current === 'apercu' && <OverviewView {...viewProps} tasks={tasks} />}
+          {current === 'suivi' && <FollowView {...viewProps} tasks={tasks} />}
+          {current === 'decisions' && <DecisionsView {...viewProps} tasks={tasks} />}
         </div>
 
-        <div className={view === 'liste' ? 'grid content-start gap-6' : 'grid content-start gap-6 lg:grid-cols-2'}>
+        <div className={current === 'liste' ? 'grid content-start gap-6' : 'grid content-start gap-6 lg:grid-cols-2'}>
           <Card className="p-5">
             <Surtitre>Discussion</Surtitre>
             <h2 className="mb-4 mt-1 text-lg font-semibold">Échanges de l’équipe</h2>
@@ -156,7 +180,7 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <TaskModal draft={draft} onClose={() => setDraft(null)} />
+      <TaskModal draft={draft} onClose={() => setDraft(null)} onOpen={(t) => setDraft(t)} />
       <ProjectModal open={editing} project={project} onClose={() => setEditing(false)} />
       <DeletePhaseModal project={project} phase={deleting} count={tasks.filter((t) => t.phase === deleting).length} onClose={() => setDeleting(null)} />
       <DuplicateModal open={dup} project={project} onClose={() => setDup(false)} />

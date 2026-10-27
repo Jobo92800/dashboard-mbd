@@ -12,6 +12,7 @@ import { ActionMenu, Avatar, Badge, Button, Modal } from './ui';
 import { Attachments, ChecklistEditor } from './TaskExtras';
 import { Discussion } from './Comments';
 import { QuickPeople } from './QuickPeople';
+import { MissionBlocks } from './MissionPanels';
 import { PresenceDot, usePresenceText } from './Presence';
 import { assigneesOf } from '../lib/assignees';
 
@@ -43,7 +44,7 @@ function Block({ icon, title, children }: { icon: React.ReactNode; title: string
 }
 
 /** Carte de lecture d'une tâche : tout voir d'un coup d'œil, cocher, commenter ; « Modifier » ouvre le formulaire. */
-export function TaskSheet({ task, onEdit, onClose }: { task: Task; onEdit: () => void; onClose: () => void }) {
+export function TaskSheet({ task, onEdit, onClose, onOpenTask }: { task: Task; onEdit: () => void; onClose: () => void; onOpenTask?: (t: Task) => void }) {
   const { snap, me, byId, setTaskStatus, setChecklist, addTaskComment, deleteTaskComment, deleteTask, saveTask, saveProject } = useStore();
   const presenceText = usePresenceText();
   const project = snap.projects.find((p) => p.id === task.project_id);
@@ -187,6 +188,8 @@ export function TaskSheet({ task, onEdit, onClose }: { task: Task; onEdit: () =>
         ) : editable ? (
           <button onClick={onEdit} className="rounded-mab-champ border border-dashed border-mab-filet px-4 py-3 text-left text-sm text-mab-gris-doux hover:border-mab-filet-aqua hover:text-mab-aqua-texte">+ Ajouter une description</button>
         ) : null}
+
+        {project?.validation_mode && <MissionBlocks task={task} project={project} editable={editable} onOpenTask={onOpenTask} />}
 
         {(task.checklist.length > 0 || editable) && (
           <Block icon={<ListChecks size={16} className="text-mab-aqua-texte" />} title={`Sous-tâches${task.checklist.length ? ` · ${checklistDone}/${task.checklist.length}` : ''}`}>

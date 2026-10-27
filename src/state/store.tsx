@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { backend } from '../data';
 import { uid } from '../data/backend';
 import type { NewMember } from '../data/backend';
-import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, Decision, Objective, ChecklistItem, Conversation, Doc, LinkFolder, Message, Profile, Project, ProjectTemplate, NotifKind, ReadMark, Snapshot, Task, TaskStatus, UsefulLink } from '../lib/types';
+import type { Absence, AbsenceStatus, Announcement, Attachment, Bucket, CalEvent, Decision, Objective, ChecklistItem, Conversation, DecisionEntry, Doc, LinkFolder, Message, Profile, Project, ProjectTemplate, NotifKind, ReadMark, Snapshot, Task, TaskStatus, TaskUpdate, UpdateState, UsefulLink } from '../lib/types';
 import { nextOccurrence, shiftIso } from '../lib/recurrence';
 import { assigneesOf, isAssigned, withAssignees } from '../lib/assignees';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
@@ -13,7 +13,7 @@ type AttachmentInput = { file?: File; name?: string; url?: string };
 
 const EMPTY: Snapshot = {
   profiles: [], projects: [], tasks: [], comments: [], events: [], notifications: [], activity: [],
-  conversations: [], messages: [], reads: [], task_comments: [], templates: [],
+  conversations: [], messages: [], reads: [], task_comments: [], task_updates: [], decisions_log: [], templates: [],
   reactions: [], announcements: [], announcement_reads: [], docs: [], absences: [], link_folders: [], links: [], last_seen: [], objectives: [],
 };
 const now = () => new Date().toISOString();
@@ -390,6 +390,109 @@ function useStoreValue() {
           await notify(others, `${firstName(me!.id)} a commenté « ${t.title} »`, link, 'tache');
         },
       );
+    },
+
+    // ---------- Pilotage des missions ----------
+    /** Valide explicitement le livrable : la mission compte alors dans la progression officielle. */
+    validateDeliverable(t: Task) {
+      const project = snap.projects.find((p) => p.id === t.project_id);
+      const patch = { validated_by: me!.id, validated_at: now(), status: 'fait' as const, done_at: t.done_at ?? now() };
+      const link = project ? `/projets/${project.id}?tache=${t.id}` : '/taches';
+      return run(
+        (st) => ({ ...st, tasks: st.tasks.map((x) => (x.id === t.id ? { ...x, ...patch } : x)) }),
+        async () => {
+          await backend.update('tasks', t.id, patch);
+          if (project) await log(`a validé le livrable « ${t.title} »${t.deliverable_version ? ` (${t.deliverable_version})` : ''}`, project.id);
+          await notify([...assigneesOf(t), project?.coordinator_id ?? ''].filter(Boolean), `✅ ${firstName(me!.id)} a validé le livrable « ${t.title} »`, link, 'tache');
+        },
+        'Livrable validé',
+      );
+    },
+
+    unvalidateDeliverable(t: Task) {
+      const patch = { validated_by: null, validated_at: null, status: 'en_cours' as const, done_at: null };
+      return run(
+        (st) => ({ ...st, tasks: st.tasks.map((x) => (x.id === t.id ? { ...x, ...patch } : x)) }),
+        async () => { await backend.update('tasks', t.id, patch); if (t.project_id) await log(`a retiré la validation de « ${t.title} »`, t.project_id); },
+        'Validation retirée',
+      );
+    },
+
+    /** Point d'avancement : historisé, il met à jour le statut et la version de la mission. */
+    addTaskUpdate(t: Task, f: Omit<TaskUpdate, 'id' | 'task_id' | 'author_id' | 'created_at'>) {
+      const project = snap.projects.find((p) => p.id === t.project_id);
+      const row: TaskUpdate = { id: uid(), task_id: t.id, author_id: me!.id, created_at: now(), ...f };
+      const status: TaskStatus = f.state === 'a_lancer' ? 'a_faire' : f.state === 'terminee' ? 'fait' : 'en_cours';
+      const patch: Partial<Task> = { status, done_at: status === 'fait' ? t.done_at ?? now() : null, ...(f.version.trim() ? { deliverable_version: f.version.trim() } : {}) };
+      const link = project ? `/projets/${project.id}?tache=${t.id}` : '/taches';
+      const label: Record<UpdateState, string> = { a_lancer: 'à lancer', en_cours: 'en cours', bloquee: 'bloquée', en_validation: 'prête à valider', terminee: 'terminée' };
+      return run(
+        (st) => ({ ...st, task_updates: [...st.task_updates, row], tasks: st.tasks.map((x) => (x.id === t.id ? { ...x, ...patch } : x)) }),
+        async () => {
+          await backend.insert('task_updates', row);
+          await backend.update('tasks', t.id, patch);
+          if (project) await log(`a fait le point sur « ${t.title} » : ${label[f.state]}`, project.id);
+          const to = [project?.coordinator_id ?? '', ...(f.state === 'en_validation' ? [project?.decider_id ?? ''] : [])].filter((id) => id && id !== me!.id);
+          await notify(to, `${f.state === 'bloquee' ? '⚠️ ' : ''}${firstName(me!.id)} a fait le point sur « ${t.title} » : ${label[f.state]}`, link, 'tache');
+        },
+        'Point d’avancement enregistré',
+      );
+    },
+
+    deleteTaskUpdate(id: string) {
+      return run((st) => ({ ...st, task_updates: st.task_updates.filter((u) => u.id !== id) }), () => backend.remove('task_updates', id), 'Point supprimé');
+    },
+
+    /** Ajoute ou modifie une entrée du journal ; une demande « à décider » prévient le décideur du projet. */
+    saveDecisionEntry(e: Partial<DecisionEntry> & { project_id: string; title: string }) {
+      const project = snap.projects.find((p) => p.id === e.project_id);
+      const existing = e.id ? snapRef.current.decisions_log.find((x) => x.id === e.id) : undefined;
+      const link = `/projets/${e.project_id}?vue=decisions`;
+      if (existing) {
+        return run(
+          (st) => ({ ...st, decisions_log: st.decisions_log.map((x) => (x.id === e.id ? { ...x, ...e } : x)) }),
+          () => backend.update('decisions_log', existing.id, e),
+          'Journal mis à jour',
+        );
+      }
+      const row: DecisionEntry = {
+        id: uid(), task_id: null, kind: 'a_decider', context: '', options: '', decision: '', consequences: '', changes_roadmap: false,
+        author_id: me!.id, decided_by: null, decided_at: null, created_at: now(), ...e,
+      };
+      return run(
+        (st) => ({ ...st, decisions_log: [row, ...st.decisions_log] }),
+        async () => {
+          await backend.insert('decisions_log', row);
+          if (row.kind === 'a_decider' && project?.decider_id && project.decider_id !== me!.id) {
+            await notify([project.decider_id], `⚖️ ${firstName(me!.id)} te demande une décision : « ${row.title} »`, link, 'projet');
+          }
+          if (row.kind === 'decision' && project) await log(`a enregistré la décision « ${row.title} »`, project.id);
+        },
+        row.kind === 'a_decider' ? 'Demande de décision envoyée' : 'Ajouté au journal',
+      );
+    },
+
+    /** Trancher une demande : décision retenue (ou option écartée), datée, avec ses conséquences. */
+    decide(e: DecisionEntry, f: { decision: string; consequences: string; changes_roadmap: boolean; accepted: boolean }) {
+      const project = snap.projects.find((p) => p.id === e.project_id);
+      const task = e.task_id ? snap.tasks.find((t) => t.id === e.task_id) : undefined;
+      const patch: Partial<DecisionEntry> = { ...f, kind: f.accepted ? 'decision' : 'rejete', decided_by: me!.id, decided_at: now() };
+      delete (patch as { accepted?: boolean }).accepted;
+      const link = `/projets/${e.project_id}?vue=decisions`;
+      return run(
+        (st) => ({ ...st, decisions_log: st.decisions_log.map((x) => (x.id === e.id ? { ...x, ...patch } : x)) }),
+        async () => {
+          await backend.update('decisions_log', e.id, patch);
+          if (project) await log(`a tranché « ${e.title} »${f.changes_roadmap ? ' (modifie la roadmap)' : ''}`, project.id);
+          const to = [e.author_id ?? '', ...(task ? assigneesOf(task) : []), ...(f.changes_roadmap ? [project?.coordinator_id ?? ''] : [])].filter((id) => id && id !== me!.id);
+          await notify([...new Set(to)], `⚖️ Décision prise : « ${e.title} »${f.changes_roadmap ? ' · la roadmap est à mettre à jour' : ''}`, link, 'projet');
+        },
+        'Décision enregistrée',
+      );
+    },
+
+    deleteDecisionEntry(id: string) {
+      return run((st) => ({ ...st, decisions_log: st.decisions_log.filter((x) => x.id !== id) }), () => backend.remove('decisions_log', id), 'Entrée supprimée');
     },
 
     deleteTaskComment(id: string) {

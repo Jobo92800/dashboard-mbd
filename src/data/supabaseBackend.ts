@@ -11,7 +11,7 @@ function clean<T extends object>(row: T): T {
 
 const TABLES: Table[] = [
   'profiles', 'projects', 'tasks', 'comments', 'events', 'notifications', 'activity',
-  'conversations', 'messages', 'reads', 'task_comments', 'templates',
+  'conversations', 'messages', 'reads', 'task_comments', 'task_updates', 'decisions_log', 'templates',
   'reactions', 'announcements', 'announcement_reads', 'docs', 'absences', 'link_folders', 'links', 'last_seen', 'objectives',
 ];
 /** « last_seen » change souvent : on ne recharge pas tout l'écran pour ça. */
