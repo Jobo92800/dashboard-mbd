@@ -3,6 +3,16 @@
 //     (1er / 2e / 3e appel datés dans la période) dont décrochés, puis bilans placés.
 //  ② Centre (thérapeutes) — base « CRM News », table Clients : une fiche par bilan
 //     réalisé en centre ; une cure est vendue quand « Montant Cure » est renseigné.
+// RÈGLE DE CA COMMUNE AUX TROIS TABLEAUX DE BORD DU GROUPE (Dashboard CA, CRM2MB,
+// MA HQ), décidée le 12 novembre 2026 :
+//   CA = les 9 colonnes de cure + « Bilan seul » − « Avoir ».
+//   Date de la vente = « Date validation », sinon « Date bilan », sinon « date de création ».
+//   Une fiche ne porte qu'UNE date de validation, celle de sa dernière cure : la 1re
+//   cure reste donc au mois de la fiche dès qu'il y a eu rachat, et seuls les
+//   renouvellements prennent la date de validation. Sans ça une cure d'avril 2025
+//   remonterait dans le mois d'un rachat d'octobre 2026 (16 fiches, 31 752 € mesurés).
+//   Les compteurs restent séparés : une cure vaut ~1 380 €, un bilan ~110 €, on ne
+//   les fond jamais dans un même compteur d'unités.
 // Réservé aux administrateurs. GET ?du=AAAA-MM-JJ&au=AAAA-MM-JJ (ou ?mois=AAAA-MM).
 // La comparaison porte sur la période précédente de même durée.
 import { callerProfile, json } from '../lib/server.mts';
@@ -81,8 +91,10 @@ const between = (field: string, from: string, to: string) => {
 };
 
 /** Par centre et par mois. */
-type Stat = { leads: number; appels: number; appeles: number; joints: number; bilans: number; realises: number; cures: number; ca: number; caBilans: number };
-const empty = (): Stat => ({ leads: 0, appels: 0, appeles: 0, joints: 0, bilans: 0, realises: 0, cures: 0, ca: 0, caBilans: 0 });
+type Stat = { leads: number; appels: number; appeles: number; joints: number; bilans: number; realises: number; cures: number;
+  /** CA de la règle commune : cures + bilans seuls − avoirs. */ ca: number;
+  caCures: number; caBilans: number; caAvoirs: number };
+const empty = (): Stat => ({ leads: 0, appels: 0, appeles: 0, joints: 0, bilans: 0, realises: 0, cures: 0, ca: 0, caCures: 0, caBilans: 0, caAvoirs: 0 });
 /** Sort des bilans placés par une commerciale. */
 type Commerciale = { leads: number; appels: number; appeles: number; joints: number; bilans: number; venus: number; annules: number; manques: number; cures: number };
 type Therapeute = { bilans: number; cures: number; ca: number };
@@ -134,8 +146,10 @@ export async function compute(from: string, to: string) {
     const phoneDates = ['Création', 'Date Bilan Placé', ...CALLS.map(([d]) => d)];
     const [master, clients] = await Promise.all([
       fetchAll(CRM, MASTER, phoneFields, `OR(${phoneDates.map((d) => between(d, prevFrom, to)).join(',')})`),
-      fetchAll(NEWS, CLIENTS, ['Centre', 'Thérapeute', 'Date bilan', 'date de création', 'Bilan seul', ...CURES],
-        `OR(${between('Date bilan', prevFrom, to)},AND(NOT({Date bilan}),${between('date de création', prevFrom, to)}))`),
+      fetchAll(NEWS, CLIENTS, ['Centre', 'Thérapeute', 'Date validation', 'Date bilan', 'date de création', 'Bilan seul', 'Avoir', ...CURES],
+        // Large exprès : une fiche entre si l'une de ses trois dates tombe dans la
+        // fenêtre. Le tri fin (1re cure / renouvellements) se fait en JavaScript.
+        `OR(${between('Date validation', prevFrom, to)},${between('Date bilan', prevFrom, to)},${between('date de création', prevFrom, to)})`),
     ]);
 
     const byMonth: Record<string, Record<string, Stat>> = {}; // 'cur' | 'prev'
@@ -191,21 +205,47 @@ export async function compute(from: string, to: string) {
     // ② Centre
     for (const r of clients) {
       const f = r.fields;
-      const m = period(dayOf(f['Date bilan']) ?? dayOf(f['date de création']));
-      if (!m) continue;
-      const s = bucket(m, centreOf(f['Centre']));
-      const cure = CURES.reduce((t, k) => t + (Number(f[k]) || 0), 0);
+      const cure1 = Number(f['Montant Cure']) || 0;
+      const rachats = CURES.slice(1).reduce((t, k) => t + (Number(f[k]) || 0), 0);
+      const nbRachats = CURES.slice(1).filter((k) => (Number(f[k]) || 0) > 0).length;
       const bilanSeul = Number(f['Bilan seul']) || 0;
-      s.realises++;
-      s.caBilans += bilanSeul;
-      if (cure > 0) { s.cures++; s.ca += cure; }
-      if (m === 'cur') {
-        const names = people(f['Thérapeute']);
+      const avoir = Number(f['Avoir']) || 0;
+      // Deux dates, pas une : voir la règle commune en tête de fichier.
+      const dVente = dayOf(f['Date validation']) ?? dayOf(f['Date bilan']) ?? dayOf(f['date de création']);
+      const dFiche = nbRachats > 0 ? (dayOf(f['date de création']) ?? dVente) : dVente;
+      const mPremiere = period(dFiche);
+      const mRachats = rachats > 0 ? period(dVente) : null;
+      if (!mPremiere && !mRachats) continue;
+      const centre = centreOf(f['Centre']);
+      const names = people(f['Thérapeute']);
+      const pourTherapeutes = (m: string, cures: number, ca: number, compteBilan: boolean) => {
+        if (m !== 'cur') return;
         for (const n of names.length ? names : ['Non renseignée']) {
           const t = (therapeutes[n] ??= { bilans: 0, cures: 0, ca: 0 });
-          t.bilans++;
-          if (cure > 0) { t.cures++; t.ca += cure / Math.max(1, names.length); }
+          if (compteBilan) t.bilans++;
+          // Volontairement le CA des CURES seul : c'est l'assiette des primes.
+          if (cures > 0) { t.cures += cures; t.ca += ca / Math.max(1, names.length); }
         }
+      };
+      // ① la 1re cure, le bilan payant et l'avoir, au mois de la fiche
+      if (mPremiere) {
+        const s = bucket(mPremiere, centre);
+        s.realises++;
+        // Un avoir est un remboursement : il se soustrait, il ne disparaît pas.
+        s.ca += cure1 + bilanSeul - avoir;
+        s.caCures += cure1;
+        s.caBilans += bilanSeul;
+        s.caAvoirs += avoir;
+        if (cure1 > 0) s.cures++;
+        pourTherapeutes(mPremiere, cure1 > 0 ? 1 : 0, cure1, true);
+      }
+      // ② les renouvellements, le jour du rachat
+      if (mRachats) {
+        const s = bucket(mRachats, centre);
+        s.ca += rachats;
+        s.caCures += rachats;
+        s.cures += nbRachats;
+        pourTherapeutes(mRachats, nbRachats, rachats, false);
       }
     }
 

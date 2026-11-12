@@ -9,7 +9,9 @@ import { isAdmin } from '../lib/permissions';
 import type { Objective } from '../lib/types';
 import { Button, Card, Empty, IconButton, Input, Modal, PageTitle, Surtitre } from '../components/ui';
 
-type Stat = { leads: number; appels: number; appeles: number; joints: number; bilans: number; realises: number; cures: number; ca: number; caBilans: number };
+/** `ca` suit la règle commune aux trois tableaux de bord : cures + bilans seuls − avoirs. */
+type Stat = { leads: number; appels: number; appeles: number; joints: number; bilans: number; realises: number; cures: number;
+  ca: number; caCures: number; caBilans: number; caAvoirs: number };
 type Commerciale = { leads: number; appels: number; appeles: number; joints: number; bilans: number; venus: number; annules: number; manques: number; cures: number };
 type Therapeute = { bilans: number; cures: number; ca: number };
 type Data = {
@@ -27,14 +29,14 @@ const KEYS: { id: keyof Stat; label: string; short: string; step: 'tel' | 'centr
   { id: 'bilans', label: 'Bilans placés', short: 'Bilans placés', step: 'tel', obj: 'bilans' },
   { id: 'realises', label: 'Bilans réalisés', short: 'Bilans réalisés', step: 'centre' },
   { id: 'cures', label: 'Cures vendues', short: 'Cures', step: 'centre', obj: 'conversions' },
-  { id: 'ca', label: 'CA cures', short: 'CA', step: 'centre', obj: 'ca' },
+  { id: 'ca', label: 'CA', short: 'CA', step: 'centre', obj: 'ca' },
 ];
 const OBJ_KEYS = [
-  { id: 'leads', label: 'Prospects' }, { id: 'bilans', label: 'Bilans placés' }, { id: 'conversions', label: 'Cures' }, { id: 'ca', label: 'CA cures (€)' },
+  { id: 'leads', label: 'Prospects' }, { id: 'bilans', label: 'Bilans placés' }, { id: 'conversions', label: 'Cures' }, { id: 'ca', label: 'CA (€)' },
 ] as const;
 const CENTRES = ['Le Grau-du-Roi', 'Le Crès', 'Sérignan', 'Cabestany', 'Avignon'];
 const euro = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
-const isMoney = (k: keyof Stat) => k === 'ca' || k === 'caBilans';
+const isMoney = (k: keyof Stat) => k === 'ca' || k === 'caCures' || k === 'caBilans' || k === 'caAvoirs';
 const fmt = (k: keyof Stat, n: number) => (isMoney(k) ? euro(n) : new Intl.NumberFormat('fr-FR').format(n));
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 const sum = (rec: Record<string, Stat>, k: keyof Stat) => Object.values(rec).reduce((s, x) => s + (x[k] ?? 0), 0);
@@ -84,11 +86,11 @@ function demoData(from: string, to: string): Data {
   const len = differenceInCalendarDays(parseISO(to), parseISO(from)) + 1;
   const k = Math.min(1, len / 30);
   const base: Record<string, Stat> = {
-    'Le Grau-du-Roi': { leads: 111, appels: 210, appeles: 144, joints: 70, bilans: 18, realises: 16, cures: 11, ca: 14800, caBilans: 390 },
-    'Le Crès': { leads: 72, appels: 136, appeles: 93, joints: 45, bilans: 17, realises: 14, cures: 8, ca: 11600, caBilans: 520 },
-    'Sérignan': { leads: 152, appels: 288, appeles: 197, joints: 96, bilans: 25, realises: 19, cures: 12, ca: 13900, caBilans: 480 },
-    'Cabestany': { leads: 129, appels: 245, appeles: 167, joints: 80, bilans: 23, realises: 15, cures: 7, ca: 9800, caBilans: 770 },
-    'Avignon': { leads: 125, appels: 237, appeles: 162, joints: 83, bilans: 31, realises: 24, cures: 14, ca: 21400, caBilans: 390 },
+    'Le Grau-du-Roi': { leads: 111, appels: 210, appeles: 144, joints: 70, bilans: 18, realises: 16, cures: 11, ca: 15190, caCures: 14800, caBilans: 390, caAvoirs: 0 },
+    'Le Crès': { leads: 72, appels: 136, appeles: 93, joints: 45, bilans: 17, realises: 14, cures: 8, ca: 12120, caCures: 11600, caBilans: 520, caAvoirs: 0 },
+    'Sérignan': { leads: 152, appels: 288, appeles: 197, joints: 96, bilans: 25, realises: 19, cures: 12, ca: 14380, caCures: 13900, caBilans: 480, caAvoirs: 0 },
+    'Cabestany': { leads: 129, appels: 245, appeles: 167, joints: 80, bilans: 23, realises: 15, cures: 7, ca: 10570, caCures: 9800, caBilans: 770, caAvoirs: 0 },
+    'Avignon': { leads: 125, appels: 237, appeles: 162, joints: 83, bilans: 31, realises: 24, cures: 14, ca: 21790, caCures: 21400, caBilans: 390, caAvoirs: 0 },
   };
   for (const s of Object.values(base)) for (const key of Object.keys(s) as (keyof Stat)[]) s[key] = Math.round(s[key] * k);
   const prev = Object.fromEntries(Object.entries(base).map(([c, s]) => [c, Object.fromEntries(Object.entries(s).map(([k, v]) => [k, Math.round(v * 0.85)])) as Stat]));
@@ -219,8 +221,8 @@ export default function Tableau() {
             <h2 className="mb-3 mt-1 text-xl font-light">Des bilans réalisés aux <b className="font-semibold">cures vendues</b></h2>
             <div className="mb-4 grid grid-cols-3 gap-3">
               <Rate label="Bilan → cure" value={pct(t('cures'), t('realises'))} hint={`${t('cures')} sur ${t('realises')} bilans`} />
-              <Card className="px-4 py-3"><p className="text-xs text-mab-texte">Panier moyen</p><p className="text-xl font-light tabular-nums">{t('cures') ? euro(t('ca') / t('cures')) : '—'}</p></Card>
-              <Card className="px-4 py-3"><p className="text-xs text-mab-texte">Bilans seuls encaissés</p><p className="text-xl font-light tabular-nums">{euro(t('caBilans'))}</p></Card>
+              <Card className="px-4 py-3"><p className="text-xs text-mab-texte">Panier moyen d'une cure</p><p className="text-xl font-light tabular-nums">{t('cures') ? euro(t('caCures') / t('cures')) : '—'}</p></Card>
+              <Card className="px-4 py-3"><p className="text-xs text-mab-texte">Détail du CA</p><p className="text-xl font-light tabular-nums">{euro(t('caCures'))}</p><p className="mt-0.5 text-xs text-mab-gris-doux">de cures · + {euro(t('caBilans'))} de bilans seuls · − {euro(t('caAvoirs'))} d'avoirs</p></Card>
             </div>
             <Card className="p-5">
               <h3 className="mb-3 text-lg font-semibold">Cures vendues par thérapeute</h3>
@@ -281,13 +283,13 @@ const COLS: { id: keyof Stat; label: string; obj?: keyof Objective }[] = [
   { id: 'bilans', label: 'Bilans placés', obj: 'bilans' },
   { id: 'realises', label: 'Bilans réalisés' },
   { id: 'cures', label: 'Cures', obj: 'conversions' },
-  { id: 'ca', label: 'CA cures', obj: 'ca' },
+  { id: 'ca', label: 'CA', obj: 'ca' },
 ];
 
 function CentreTable({ data, objectives, project, isCurrent }: { data: Data; objectives: Map<string, Objective>; project: (n: number) => number; isCurrent: boolean }) {
   const rows = [...CENTRES, ...Object.keys(data.current).filter((c) => !CENTRES.includes(c))];
   const max = (k: keyof Stat) => Math.max(1, ...rows.map((c) => data.current[c]?.[k] ?? 0));
-  const stat = (c: string): Stat => data.current[c] ?? { leads: 0, appels: 0, appeles: 0, joints: 0, bilans: 0, realises: 0, cures: 0, ca: 0, caBilans: 0 };
+  const stat = (c: string): Stat => data.current[c] ?? { leads: 0, appels: 0, appeles: 0, joints: 0, bilans: 0, realises: 0, cures: 0, ca: 0, caCures: 0, caBilans: 0, caAvoirs: 0 };
   const cell = (c: string, col: typeof COLS[number]) => {
     const v = stat(c)[col.id] ?? 0;
     const goal = col.obj ? (objectives.get(c)?.[col.obj] as number | null | undefined) : null;
