@@ -21,20 +21,28 @@ const CRM = process.env.AIRTABLE_BASE_ID || 'appNML7rJEKiWkuVg';
 const MASTER = process.env.AIRTABLE_TABLE_ID || 'tblgCdNITlPy74Z5G';
 const NEWS = process.env.AIRTABLE_CLIENTS_BASE_ID || 'appI97jEL2mSCg3Wc';
 const CLIENTS = 'tblfqxwGePzeiWqqY';
-const CENTRES = ['Le Grau-du-Roi', 'Le Crès', 'Sérignan', 'Cabestany', 'Avignon'] as const;
+const CENTRES = ['Le Grau-du-Roi', 'Le Crès', 'Sérignan', 'Pollestres', 'Avignon'] as const;
 /** Les trois tentatives d'appel : [date de l'appel, case « a décroché »]. */
 const CALLS = [['1er Appel', 'Répondu Appel 1'], ['2ème Appel', 'Répondu Appel 2'], ['3ème Appel', 'Répondu Appel 3']] as const;
 const CURES = ['Montant Cure', ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Montant cure ${n}`)];
 
 type Rec = { fields: Record<string, unknown> };
 
-/** « LGR », « Grau-du-Roi », « Le Grau-du-Roi (30) » → « Le Grau-du-Roi ». */
+/**
+ * « LGR », « Grau-du-Roi », « Le Grau-du-Roi (30) » → « Le Grau-du-Roi ».
+ *
+ * Le centre de Cabestany a déménagé à Pollestres. Les deux bases Airtable
+ * n'ont pas été renommées en même temps : « CRM News » dit « Pollestres »
+ * depuis le 20 novembre 2026, « Prospects Master » dit encore
+ * « Cabestany ». Les deux libellés doivent donc tomber sur le même centre,
+ * sans quoi la moitié des chiffres part dans « Non renseigné ».
+ */
 function centreOf(v: unknown) {
   const s = String((v as { name?: string })?.name ?? v ?? '').toLowerCase();
   if (/grau|lgr/.test(s)) return 'Le Grau-du-Roi';
   if (/cr[eè]s/.test(s)) return 'Le Crès';
   if (/s[ée]rignan/.test(s)) return 'Sérignan';
-  if (/cabestany/.test(s)) return 'Cabestany';
+  if (/cabestany|pollestres/.test(s)) return 'Pollestres';
   if (/avignon/.test(s)) return 'Avignon';
   return 'Non renseigné';
 }

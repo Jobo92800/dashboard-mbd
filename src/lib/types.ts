@@ -4,7 +4,7 @@ export type Priority = 'Haute' | 'Moyenne' | 'Basse';
 export type TaskStatus = 'a_faire' | 'en_cours' | 'fait';
 export type ProjectStatus = 'planifie' | 'en_cours' | 'termine' | 'archive';
 
-export const CENTRES = ['Le Grau-du-Roi', 'Avignon', 'Sérignan', 'Cabestany', 'Le Crès'] as const;
+export const CENTRES = ['Le Grau-du-Roi', 'Avignon', 'Sérignan', 'Pollestres', 'Le Crès'] as const;
 export const QUICK_TYPES = ['Appel', 'Commande', 'Client', 'Centre', 'Administratif', 'Autre'] as const;
 export const EVENT_TYPES = ['Réunion flash', 'Réunion', 'Point info', 'Point stratégique', 'Formation', 'Autre'] as const;
 export const PRIORITIES: Priority[] = ['Haute', 'Moyenne', 'Basse'];

@@ -34,7 +34,7 @@ const KEYS: { id: keyof Stat; label: string; short: string; step: 'tel' | 'centr
 const OBJ_KEYS = [
   { id: 'leads', label: 'Prospects' }, { id: 'bilans', label: 'Bilans placés' }, { id: 'conversions', label: 'Cures' }, { id: 'ca', label: 'CA (€)' },
 ] as const;
-const CENTRES = ['Le Grau-du-Roi', 'Le Crès', 'Sérignan', 'Cabestany', 'Avignon'];
+const CENTRES = ['Le Grau-du-Roi', 'Le Crès', 'Sérignan', 'Pollestres', 'Avignon'];
 const euro = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
 const isMoney = (k: keyof Stat) => k === 'ca' || k === 'caCures' || k === 'caBilans' || k === 'caAvoirs';
 const fmt = (k: keyof Stat, n: number) => (isMoney(k) ? euro(n) : new Intl.NumberFormat('fr-FR').format(n));
@@ -89,7 +89,7 @@ function demoData(from: string, to: string): Data {
     'Le Grau-du-Roi': { leads: 111, appels: 210, appeles: 144, joints: 70, bilans: 18, realises: 16, cures: 11, ca: 15190, caCures: 14800, caBilans: 390, caAvoirs: 0 },
     'Le Crès': { leads: 72, appels: 136, appeles: 93, joints: 45, bilans: 17, realises: 14, cures: 8, ca: 12120, caCures: 11600, caBilans: 520, caAvoirs: 0 },
     'Sérignan': { leads: 152, appels: 288, appeles: 197, joints: 96, bilans: 25, realises: 19, cures: 12, ca: 14380, caCures: 13900, caBilans: 480, caAvoirs: 0 },
-    'Cabestany': { leads: 129, appels: 245, appeles: 167, joints: 80, bilans: 23, realises: 15, cures: 7, ca: 10570, caCures: 9800, caBilans: 770, caAvoirs: 0 },
+    'Pollestres': { leads: 129, appels: 245, appeles: 167, joints: 80, bilans: 23, realises: 15, cures: 7, ca: 10570, caCures: 9800, caBilans: 770, caAvoirs: 0 },
     'Avignon': { leads: 125, appels: 237, appeles: 162, joints: 83, bilans: 31, realises: 24, cures: 14, ca: 21790, caCures: 21400, caBilans: 390, caAvoirs: 0 },
   };
   for (const s of Object.values(base)) for (const key of Object.keys(s) as (keyof Stat)[]) s[key] = Math.round(s[key] * k);
